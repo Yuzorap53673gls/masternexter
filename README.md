@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | VERSÃO FINAL COM AIMBOT FORTE + AUTO-SWITCH + RAPID FIRE
+--// ROYALITY HUB | AIMBOT INTELIGENTE COM ATIVAÇÃO DINÂMICA
 --// ==========================================
 
 local Success, Rayfield = pcall(function()
@@ -26,10 +26,10 @@ getgenv().Config = {
     AimbotEnabled = true,
     TeamCheck = false,
     AimPart = "Head",
-    FOVRadius = 400,
-    AimbotStrength = 10, -- Força brutal para grudar na cabeça
+    FOVRadius = 450,
+    AimbotStrength = 15, -- Força máxima de grude
     RapidFireEnabled = false,
-    AutoSwitchEnabled = false, -- Novo: Troca de arma automática ao descarregar
+    AutoSwitchEnabled = false,
     DamageMultiplier = 3.0,
     FlyEnabled = false,
     FlySpeed = 60,
@@ -42,15 +42,15 @@ local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
---// Círculo FOV Seguro
+--// Círculo FOV Dinâmico (Muda de cor se achar alvo)
 local FOVCircle = nil
 pcall(function()
     if Drawing then
         FOVCircle = Drawing.new("Circle")
         FOVCircle.Visible = true
-        FOVCircle.Transparency = 0.5
-        FOVCircle.Color = Color3.fromRGB(255, 50, 50)
-        FOVCircle.Thickness = 1.5
+        FOVCircle.Transparency = 0.6
+        FOVCircle.Color = Color3.fromRGB(255, 50, 50) -- Vermelho padrão
+        FOVCircle.Thickness = 1.8
         FOVCircle.NumSides = 32
         FOVCircle.Radius = Config.FOVRadius
         FOVCircle.Filled = false
@@ -59,7 +59,7 @@ end)
 
 --// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Final v10",
+    Name = "Royality Hub | Ultimate Final v11",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -72,7 +72,7 @@ local T3 = Window:CreateTab("Visual (ESP)", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "🎯 Aimbot Imortal (Grude Forte na Cabeça)",
+    Name = "🎯 Aimbot Inteligente (Ativação Automática)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
@@ -182,7 +182,7 @@ T3:CreateToggle({
 })
 
 --// ==========================================
---// SISTEMA DE AUTOMATIZAÇÃO E AIMBOT
+--// LOOP PRINCIPAL DE COMBATE E AUTOMAÇÃO
 --// ==========================================
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
@@ -212,7 +212,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Aimbot Imortal (Grude Forte com Re-Lock Automático)
+        -- Aimbot Inteligente (Só ativa se houver alvo válido na tela, sem delay)
         if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
@@ -236,14 +236,18 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end
 
-            -- Se houver alvo no raio, trava a câmera com força máxima ajustável
             if closestTarget then
+                -- Alvo encontrado: Muda o FOV para Verde/Vermelho vivo e trava na cabeça instantaneamente
+                if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
                 local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
-                Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.1, 1))
+                Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
+            else
+                -- Nenhum alvo na mira: Aimbot desliga automaticamente e devolve controle total da câmera
+                if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
             end
         end
 
-        -- Auto-Switch Weapon (Troca de arma automática se descarregar)
+        -- Auto-Switch Weapon (Troca automática se a arma descarregar)
         local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
         if Config.AutoSwitchEnabled and char and backpack then
@@ -251,7 +255,6 @@ RunService.RenderStepped:Connect(function(dt)
             if currentTool then
                 local ammoVal = currentTool:FindFirstChild("Ammo") or currentTool:FindFirstChild("Clip") or currentTool:FindFirstChild("Bullets")
                 if ammoVal and ammoVal.Value <= 0 then
-                    -- Procura outra arma no inventário para equipar
                     for _, tool in ipairs(backpack:GetChildren()) do
                         if tool:IsA("Tool") then
                             char.Humanoid:EquipTool(tool)
@@ -301,6 +304,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub Atualizado!",
-    Content = "Aimbot Imortal e Auto-Switch Ativados.",
+    Content = "Aimbot Inteligente com Ativação Automática Ativo.",
     Duration = 4
 })
