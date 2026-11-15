@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | DEFINITIVO + AIMBOT 500% + KILL AURA MODO AVIÃO
+--// ROYALITY HUB | DEFINITIVO + KILL AURA MODO AVIÃO CORRIGIDO
 --// ==========================================
 
 local s,R=pcall(function()return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()end)
@@ -16,7 +16,7 @@ getgenv().Config={
     AimPart="Head",
     FOVRadius=250,
     MaxDistance=500,
-    AimbotPrecision=500, -- Aumentado de 100 para 500% de precisão máxima
+    AimbotPrecision=500,
     ShowCursor=true,
     RapidFireEnabled=true,
     DamageMultiplier=3.0,
@@ -24,7 +24,7 @@ getgenv().Config={
     FlyEnabled=false,
     FlySpeed=70,
     KillAuraEnabled=false,
-    PlaneKillAuraEnabled=false -- Novo: Kill Aura Modo Avião (Mata instantâneo ao sair)
+    PlaneKillAuraEnabled=false -- Kill Aura Modo Avião Definitivo (Ativa ao sair do avião)
 }
 
 local P=game:GetService("Players")
@@ -53,7 +53,7 @@ end)
 
 --// Janela Rayfield
 local W=R:CreateWindow({
-    Name="Royality Hub | Ultimate Corrigido v4",
+    Name="Royality Hub | Ultimate Corrigido v5",
     LoadingTitle="Carregando...",
     LoadingSubtitle="Delta Executor",
     ConfigurationSaving={Enabled=false},
@@ -95,7 +95,7 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
-    Name="🛩️ Kill Aura Modo Avião (Mata Instantâneo ao Sair)",
+    Name="🛩️ Kill Aura Modo Avião (Mata Todos ao Sair)",
     CurrentValue=Config.PlaneKillAuraEnabled,
     Flag="PKA",
     Callback=function(v)
@@ -316,7 +316,6 @@ local CurrentTargetPart=nil
 local oldIndex
 oldIndex=hookmetamethod(game,"__index",newcclosure(function(self,key)
     if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
-        -- Chance baseada na precisão de 0 a 500% (acima de 100% ativa sempre com bônus de acerto absoluto)
         if math.random(0, 500) <= Config.AimbotPrecision then
             if self==Mouse then
                 if key=="Hit" then
@@ -449,7 +448,7 @@ if LP.Character then setupChar(LP.Character) end
 LP.CharacterAdded:Connect(setupChar)
 
 --// ==========================================
---// LOOP PRINCIPAL (FLY + KILL AURA + MODO AVIÃO)
+--// LOOP PRINCIPAL (FLY + KILL AURA + MODO AVIÃO CORRIGIDO)
 --// ==========================================
 RS.RenderStepped:Connect(function(dt)
     CurrentTargetPart=Config.SilentAimEnabled and getBestTarget() or nil
@@ -525,19 +524,22 @@ RS.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- 3. Kill Aura Modo Avião (Eliminação instantânea ao sair/spawnar)
+        -- 3. Kill Aura Modo Avião Definitivo (Monitora e elimina todos ao sair da queda livre / avião)
         if Config.PlaneKillAuraEnabled then
-            for _,p in ipairs(P:GetPlayers()) do
-                if p~=LP and p.Character then
-                    local pHum=p.Character:FindFirstChildOfClass("Humanoid")
-                    local pRp=p.Character:FindFirstChild("HumanoidRootPart")
-                    if pHum and pHum.Health>0 and pRp then
-                        if not Config.TeamCheck or p.Team~=LP.Team then
-                            -- Teleporta instantaneamente para cima de cada inimigo e ativa o dano máximo em série
-                            rp.CFrame = pRp.CFrame + Vector3.new(0, 4, 0)
-                            local tool = char:FindFirstChildOfClass("Tool")
-                            if tool then
-                                pcall(function() tool:Activate() end)
+            -- Verifica se você ou os oponentes saíram do avião (quando o State é Freefall ou Pulou)
+            if hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping or rp.Position.Y < 400 then
+                for _,p in ipairs(P:GetPlayers()) do
+                    if p~=LP and p.Character then
+                        local pHum=p.Character:FindFirstChildOfClass("Humanoid")
+                        local pRp=p.Character:FindFirstChild("HumanoidRootPart")
+                        if pHum and pHum.Health>0 and pRp then
+                            if not Config.TeamCheck or p.Team~=LP.Team then
+                                -- Teletransporte relâmpago para cima de cada inimigo em massa
+                                rp.CFrame = pRp.CFrame + Vector3.new(0, 3, 0)
+                                local tool = char:FindFirstChildOfClass("Tool")
+                                if tool then
+                                    pcall(function() tool:Activate() end)
+                                end
                             end
                         end
                     end
@@ -549,6 +551,6 @@ end)
 
 R:Notify({
     Title="Royality Hub Atualizado!",
-    Content="Precisão 500% e Kill Aura Modo Avião Ativados.",
+    Content="Kill Aura Modo Avião Definitivo Ativado.",
     Duration=4
 })
