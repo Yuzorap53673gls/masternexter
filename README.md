@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | DEFINITIVO + KILL AURA AÉREO FLUIDO + AIMBOT CERTEIRO
+--// ROYALITY HUB | DEFINITIVO + SLIDER DE PRECISÃO AIMBOT (0-100%)
 --// ==========================================
 
 local s,R=pcall(function()return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()end)
@@ -14,15 +14,16 @@ getgenv().Config={
     TeamCheck=false,
     WallCheck=true,
     AimPart="Head",
-    FOVRadius=220, -- Raio amplo para garantir o tiro certo
+    FOVRadius=220,
     MaxDistance=400,
+    AimbotPrecision=100, -- Novo: Controle de precisão de 0 a 100%
     ShowCursor=true,
     RapidFireEnabled=true,
     DamageMultiplier=3.0,
     AntiRecoilPower=5.0,
     FlyEnabled=false,
     FlySpeed=70,
-    KillAuraEnabled=false -- Kill Aura Aéreo Suave
+    KillAuraEnabled=false
 }
 
 local P=game:GetService("Players")
@@ -51,7 +52,7 @@ end)
 
 --// Janela Rayfield
 local W=R:CreateWindow({
-    Name="Royality Hub | Ultimate Corrigido v2",
+    Name="Royality Hub | Ultimate Corrigido v3",
     LoadingTitle="Carregando...",
     LoadingSubtitle="Delta Executor",
     ConfigurationSaving={Enabled=false},
@@ -64,13 +65,23 @@ local T3=W:CreateTab("Visual (ESP)",4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name="🎯 Aimbot / Silent Aim Definitivo (Tiro na Cabeça)",
+    Name="🎯 Aimbot / Silent Aim Definitivo",
     CurrentValue=Config.SilentAimEnabled,
     Flag="SA",
     Callback=function(v)
         Config.SilentAimEnabled=v
         if FC then FC.Visible=v end
     end
+})
+
+T1:CreateSlider({
+    Name="⚡ Precisão do Aimbot (Grudar na Cabeça)",
+    Range={0, 100},
+    Increment=5,
+    Suffix="%",
+    CurrentValue=Config.AimbotPrecision,
+    Flag="AAP",
+    Callback=function(v) Config.AimbotPrecision=v end
 })
 
 T1:CreateToggle({
@@ -234,7 +245,7 @@ T3:CreateToggle({
 })
 
 --// ==========================================
---// LÓGICA DE ALVO E VISIBILIDADE CERTEIRA
+--// LÓGICA DE ALVO E VISIBILIDADE
 --// ==========================================
 local function isVisible(targetPart, targetChar)
     if not Config.WallCheck then return true end
@@ -288,13 +299,13 @@ local function getBestTarget()
 end
 
 --// ==========================================
---// SILENT AIM CERTEIRO (DIRETO NA CABEÇA)
+--// SILENT AIM COM PRECISÃO AJUSTÁVEL (0-100%)
 --// ==========================================
 local CurrentTargetPart=nil
 
 local oldIndex
 oldIndex=hookmetamethod(game,"__index",newcclosure(function(self,key)
-    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
+    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart and math.random(0, 100) <= Config.AimbotPrecision then
         if self==Mouse then
             if key=="Hit" then
                 local finalPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.1, 0)
@@ -311,7 +322,7 @@ local oldNamecall
 oldNamecall=hookmetamethod(game,"__namecall",newcclosure(function(self,...)
     local method=getnamecallmethod()
     local args={...}
-    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
+    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart and math.random(0, 100) <= Config.AimbotPrecision then
         if self==workspace and method=="Raycast" and typeof(args[1])=="Vector3" and typeof(args[2])=="Vector3" then
             local origin=args[1]
             local targetPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.1, 0)
@@ -384,7 +395,7 @@ local function manageESP(p)
                 arrow.TextStrokeTransparency=0
                 arrow.TextSize=20
                 arrow.Font=Enum.Font.GothamBold
-                arrow.Parent=bb
+                txt.Parent=bb
             end
             bb.Enabled=true
         elseif bb then
@@ -467,7 +478,7 @@ RS.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- 2. Kill Aura Aéreo Suave (Voa pelo ar até o inimigo sem flicar a tela)
+        -- 2. Kill Aura Aéreo Suave
         if Config.KillAuraEnabled then
             hum.PlatformStand=true
             for _,part in ipairs(char:GetDescendants()) do
@@ -482,11 +493,9 @@ RS.RenderStepped:Connect(function(dt)
                     if pHum and pHum.Health>0 and pRp then
                         if not Config.TeamCheck or p.Team~=LP.Team then
                             targetFound = true
-                            -- Voa suavemente por cima do inimigo (a 6 studs de altura)
                             local targetPos = pRp.CFrame + Vector3.new(0, 6, 0)
                             rp.CFrame = rp.CFrame:Lerp(targetPos, math.clamp(dt * 12, 0, 1))
                             
-                            -- Ativa a arma automaticamente
                             local tool = char:FindFirstChildOfClass("Tool")
                             if tool then
                                 pcall(function() tool:Activate() end)
@@ -505,6 +514,6 @@ end)
 
 R:Notify({
     Title="Royality Hub Atualizado!",
-    Content="Kill Aura Aéreo e Aimbot Certeiro Ativados.",
+    Content="Precisão do Aimbot (0-100%) Adicionada com Sucesso.",
     Duration=4
 })
