@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | AIMBOT INTELIGENTE COM ATIVAÇÃO DINÂMICA
+--// ROYALITY HUB | AIMBOT INTELIGENTE COM WALLCHECK + DISTÂNCIA
 --// ==========================================
 
 local Success, Rayfield = pcall(function()
@@ -25,9 +25,11 @@ getgenv().Config = {
     ESPEnabled = true,
     AimbotEnabled = true,
     TeamCheck = false,
+    WallCheck = true, -- Novo: Não puxa se estiver atrás da parede
+    MaxAimDistance = 250, -- Novo: Distância máxima em studs para o aimbot grudar (ignora longe)
     AimPart = "Head",
-    FOVRadius = 450,
-    AimbotStrength = 15, -- Força máxima de grude
+    FOVRadius = 400,
+    AimbotStrength = 15,
     RapidFireEnabled = false,
     AutoSwitchEnabled = false,
     DamageMultiplier = 3.0,
@@ -42,14 +44,14 @@ local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
---// Círculo FOV Dinâmico (Muda de cor se achar alvo)
+--// Círculo FOV Dinâmico
 local FOVCircle = nil
 pcall(function()
     if Drawing then
         FOVCircle = Drawing.new("Circle")
         FOVCircle.Visible = true
         FOVCircle.Transparency = 0.6
-        FOVCircle.Color = Color3.fromRGB(255, 50, 50) -- Vermelho padrão
+        FOVCircle.Color = Color3.fromRGB(255, 50, 50)
         FOVCircle.Thickness = 1.8
         FOVCircle.NumSides = 32
         FOVCircle.Radius = Config.FOVRadius
@@ -59,7 +61,7 @@ end)
 
 --// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Final v11",
+    Name = "Royality Hub | Ultimate Final v12",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -72,13 +74,30 @@ local T3 = Window:CreateTab("Visual (ESP)", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "🎯 Aimbot Inteligente (Ativação Automática)",
+    Name = "🎯 Aimbot Inteligente (Com WallCheck e Distância)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
         Config.AimbotEnabled = v
         if FOVCircle then FOVCircle.Visible = v end
     end
+})
+
+T1:CreateToggle({
+    Name = "🧱 WallCheck (Não puxa através de paredes)",
+    CurrentValue = Config.WallCheck,
+    Flag = "WC",
+    Callback = function(v) Config.WallCheck = v end
+})
+
+T1:CreateSlider({
+    Name = "Distância Máxima do Aimbot",
+    Range = {50, 600},
+    Increment = 25,
+    Suffix = " studs",
+    CurrentValue = Config.MaxAimDistance,
+    Flag = "MAD",
+    Callback = function(v) Config.MaxAimDistance = v end
 })
 
 T1:CreateSlider({
@@ -182,7 +201,26 @@ T3:CreateToggle({
 })
 
 --// ==========================================
---// LOOP PRINCIPAL DE COMBATE E AUTOMAÇÃO
+--// FUNÇÃO DE VISIBILIDADE (WALLCHECK SEGURO)
+--// ==========================================
+local function isVisible(targetPart, targetCharacter)
+    if not Config.WallCheck then return true end
+    local origin = Cam.CFrame.Position
+    local direction = (targetPart.Position - origin)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LP.Character, Cam}
+    raycastParams.IgnoreWater = true
+    
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    if result then
+        return result.Instance:IsDescendantOf(targetCharacter)
+    end
+    return true
+end
+
+--// ==========================================
+--// LOOP PRINCIPAL DE COMBATE
 --// ==========================================
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
@@ -212,24 +250,33 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Aimbot Inteligente (Só ativa se houver alvo válido na tela, sem delay)
+        -- Aimbot Inteligente com WallCheck e Distância Máxima
         if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
+            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 
             for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then
+                if p ~= LP and p.Character and myRoot then
                     local hum = p.Character:FindFirstChildOfClass("Humanoid")
                     local part = p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
-                    if hum and hum.Health > 0 and part then
+                    local rp = p.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if hum and hum.Health > 0 and part and rp then
                         if Config.TeamCheck and p.Team == LP.Team then continue end
-                        local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
-                        if onScreen then
-                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                            if dist < shortestDist then
-                                shortestDist = dist
-                                closestTarget = part
+                        
+                        -- Verifica a distância máxima
+                        local worldDist = (rp.Position - myRoot.Position).Magnitude
+                        if worldDist <= Config.MaxAimDistance then
+                            -- Verifica se está visível na tela e sem parede na frente
+                            local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
+                            if onScreen and isVisible(part, p.Character) then
+                                local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                                if dist < shortestDist then
+                                    shortestDist = dist
+                                    closestTarget = part
+                                end
                             end
                         end
                     end
@@ -237,17 +284,15 @@ RunService.RenderStepped:Connect(function(dt)
             end
 
             if closestTarget then
-                -- Alvo encontrado: Muda o FOV para Verde/Vermelho vivo e trava na cabeça instantaneamente
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
                 local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
                 Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
             else
-                -- Nenhum alvo na mira: Aimbot desliga automaticamente e devolve controle total da câmera
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
             end
         end
 
-        -- Auto-Switch Weapon (Troca automática se a arma descarregar)
+        -- Auto-Switch Weapon
         local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
         if Config.AutoSwitchEnabled and char and backpack then
@@ -303,7 +348,7 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Atualizado!",
-    Content = "Aimbot Inteligente com Ativação Automática Ativo.",
+    Title = "Royality Hub Finalizado!",
+    Content = "WallCheck e Distância Máxima Ativados com Sucesso.",
     Duration = 4
 })
