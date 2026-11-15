@@ -1,24 +1,24 @@
-local Rayfield = nil
-local success, result = pcall(function()
+--// ==========================================
+--// ROYALITY HUB | ULTIMATE COMPLETO & ESTABILIZADO
+--// ==========================================
+
+local Success, Rayfield = pcall(function()
     return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 end)
 
-if success and result then
-    Rayfield = result
-else
-    local successAlt, resultAlt = pcall(function()
+if not Success or not Rayfield then
+    Success, Rayfield = pcall(function()
         return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
     end)
-    if successAlt and resultAlt then
-        Rayfield = resultAlt
-    else
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Erro Crítico",
-            Text = "Falha ao carregar a interface. Verifique sua conexão.",
-            Duration = 6
-        })
-        return
-    end
+end
+
+if not Rayfield then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Erro ao Carregar",
+        Text = "Falha na interface Rayfield. Verifique a internet.",
+        Duration = 5
+    })
+    return
 end
 
 getgenv().Config = {
@@ -27,8 +27,8 @@ getgenv().Config = {
     TeamCheck = false,
     WallCheck = false,
     AimPart = "Head",
-    FOVRadius = 400,
-    MaxDistance = 1000,
+    FOVRadius = 500,
+    MaxDistance = 2000,
     AimbotPrecision = 500,
     ShowCursor = true,
     RapidFireEnabled = true,
@@ -40,35 +40,37 @@ getgenv().Config = {
     PlaneKillAuraEnabled = false
 }
 
-local P = game:GetService("Players")
-local RS = game:GetService("RunService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
-local LP = P.LocalPlayer
+local LP = Players.LocalPlayer
 local Mouse = LP:GetMouse()
 local Cam = workspace.CurrentCamera
 
-UIS.MouseIconEnabled = Config.ShowCursor
+pcall(function()
+    UIS.MouseIconEnabled = Config.ShowCursor
+end)
 
---// Círculo FOV Visual
-local FC = nil
+--// Círculo FOV
+local FOVCircle = nil
 pcall(function()
     if Drawing then
-        FC = Drawing.new("Circle")
-        FC.Visible = true
-        FC.Transparency = 0.6
-        FC.Color = Color3.fromRGB(255, 0, 0)
-        FC.Thickness = 2
-        FC.NumSides = 64
-        FC.Radius = Config.FOVRadius
-        FC.Filled = false
+        FOVCircle = Drawing.new("Circle")
+        FOVCircle.Visible = true
+        FOVCircle.Transparency = 0.6
+        FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+        FOVCircle.Thickness = 2
+        FOVCircle.NumSides = 64
+        FOVCircle.Radius = Config.FOVRadius
+        FOVCircle.Filled = false
     end
 end)
 
---// Janela Rayfield
+--// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Definitivo v7",
-    LoadingTitle = "Carregando Hub...",
-    LoadingSubtitle = "Delta Executor",
+    Name = "Royality Hub | Ultimate Final v8",
+    LoadingTitle = "Carregando Royality Hub...",
+    LoadingSubtitle = "Delta Executor - 100% Estável",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
@@ -79,17 +81,17 @@ local T3 = Window:CreateTab("Visual (ESP)", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "🎯 Aimbot Talo na Cabeça (100% Certeiro)",
+    Name = "🎯 Aimbot Talo na Cabeça (500%)",
     CurrentValue = Config.SilentAimEnabled,
     Flag = "SA",
     Callback = function(v)
         Config.SilentAimEnabled = v
-        if FC then FC.Visible = v end
+        if FOVCircle then FOVCircle.Visible = v end
     end
 })
 
 T1:CreateSlider({
-    Name = "⚡ Precisão do Aimbot (500%)",
+    Name = "⚡ Precisão Extrema do Aimbot",
     Range = {100, 500},
     Increment = 50,
     Suffix = "%",
@@ -99,7 +101,7 @@ T1:CreateSlider({
 })
 
 T1:CreateToggle({
-    Name = "✈️ Kill Aura Aéreo (Comum)",
+    Name = "✈️ Kill Aura Aéreo (Voa e Mata)",
     CurrentValue = Config.KillAuraEnabled,
     Flag = "KA",
     Callback = function(v)
@@ -137,9 +139,9 @@ T1:CreateSlider({
 })
 
 T1:CreateSlider({
-    Name = "Distância Máxima do Aimbot",
-    Range = {100, 2000},
-    Increment = 50,
+    Name = "Distância Máxima",
+    Range = {100, 3000},
+    Increment = 100,
     Suffix = " studs",
     CurrentValue = Config.MaxDistance,
     Flag = "MD",
@@ -148,13 +150,13 @@ T1:CreateSlider({
 
 T1:CreateSlider({
     Name = "Raio de Mira (FOV)",
-    Range = {100, 1000},
+    Range = {100, 1200},
     Increment = 25,
     CurrentValue = Config.FOVRadius,
     Flag = "FOV",
     Callback = function(v)
         Config.FOVRadius = v
-        if FC then FC.Radius = v end
+        if FOVCircle then FOVCircle.Radius = v end
     end
 })
 
@@ -174,7 +176,7 @@ T1:CreateToggle({
 
 T1:CreateSlider({
     Name = "Multiplicador de Dano",
-    Range = {1, 20},
+    Range = {1, 25},
     Increment = 1,
     Suffix = "x",
     CurrentValue = Config.DamageMultiplier,
@@ -198,7 +200,7 @@ T2:CreateToggle({
 
 T2:CreateSlider({
     Name = "Velocidade do Voo",
-    Range = {20, 300},
+    Range = {20, 350},
     Increment = 10,
     CurrentValue = Config.FlySpeed,
     Flag = "FS",
@@ -225,13 +227,16 @@ T2:CreateButton({
 })
 
 local pNames = {}
-for _, p in ipairs(P:GetPlayers()) do
-    if p ~= LP then table.insert(pNames, p.Name) end
-end
-P.PlayerAdded:Connect(function(p)
+pcall(function()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then table.insert(pNames, p.Name) end
+    end
+end)
+
+Players.PlayerAdded:Connect(function(p)
     if p ~= LP then table.insert(pNames, p.Name) end
 end)
-P.PlayerRemoving:Connect(function(p)
+Players.PlayerRemoving:Connect(function(p)
     for i, n in ipairs(pNames) do
         if n == p.Name then table.remove(pNames, i) end
     end
@@ -243,7 +248,7 @@ T2:CreateDropdown({
     CurrentOption = "",
     Flag = "TPJ",
     Callback = function(o)
-        local tp = P:FindFirstChild(o)
+        local tp = Players:FindFirstChild(o)
         if tp and tp.Character and tp.Character:FindFirstChild("HumanoidRootPart") and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
             LP.Character.HumanoidRootPart.CFrame = tp.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
         end
@@ -264,24 +269,24 @@ T3:CreateToggle({
     Flag = "CUR",
     Callback = function(v)
         Config.ShowCursor = v
-        UIS.MouseIconEnabled = v
+        pcall(function() UIS.MouseIconEnabled = v end)
     end
 })
 
 --// ==========================================
---// BUSCA DE ALVO ABSOLUTA (AIMBOT NA CABEÇA)
+--// ALVO ABSOLUTO (AIMBOT NA CABEÇA)
 --// ==========================================
 local function getBestTarget()
     local closestPart = nil
     local shortestDist = math.huge
     local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-    if FC then FC.Position = screenCenter end
+    if FOVCircle then FOVCircle.Position = screenCenter end
 
     local myChar = LP.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myRoot then return nil end
 
-    for _, p in ipairs(P:GetPlayers()) do
+    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LP and p.Character then
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
             local rp = p.Character:FindFirstChild("HumanoidRootPart")
@@ -302,7 +307,7 @@ local function getBestTarget()
     end
 
     if not closestPart then
-        for _, p in ipairs(P:GetPlayers()) do
+        for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LP and p.Character then
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
                 local rp = p.Character:FindFirstChild("HumanoidRootPart")
@@ -321,46 +326,48 @@ local function getBestTarget()
 end
 
 --// ==========================================
---// SILENT AIM DEFINITIVO
+--// HOOKS DE SILENT AIM PROTEGIDOS
 --// ==========================================
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
-    if not checkcaller() and Config.SilentAimEnabled then
-        local target = getBestTarget()
-        if target then
-            if self == Mouse then
-                if key == "Hit" then
-                    return CFrame.new(target.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0))
-                elseif key == "Target" then
-                    return target.Parent:FindFirstChild("Head") or target
+pcall(function()
+    local oldIndex
+    oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+        if not checkcaller() and Config.SilentAimEnabled then
+            local target = getBestTarget()
+            if target then
+                if self == Mouse then
+                    if key == "Hit" then
+                        return CFrame.new(target.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0))
+                    elseif key == "Target" then
+                        return target.Parent:FindFirstChild("Head") or target
+                    end
                 end
             end
         end
-    end
-    return oldIndex(self, key)
-end))
+        return oldIndex(self, key)
+    end))
 
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    if not checkcaller() and Config.SilentAimEnabled then
-        local target = getBestTarget()
-        if target then
-            if self == workspace and method == "Raycast" and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
-                local origin = args[1]
-                local targetPos = target.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
-                local dir = (targetPos - origin).Unit * args[2].Magnitude
-                args[2] = dir
-                return oldNamecall(self, unpack(args))
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        if not checkcaller() and Config.SilentAimEnabled then
+            local target = getBestTarget()
+            if target then
+                if self == workspace and method == "Raycast" and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+                    local origin = args[1]
+                    local targetPos = target.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
+                    local dir = (targetPos - origin).Unit * args[2].Magnitude
+                    args[2] = dir
+                    return oldNamecall(self, unpack(args))
+                end
             end
         end
-    end
-    return oldNamecall(self, ...)
-end))
+        return oldNamecall(self, ...)
+    end))
+end)
 
 --// ==========================================
---// ESP COMPLETO
+--// ESP ESTÁVEL
 --// ==========================================
 local function manageESP(p)
     if p == LP or not p.Character then return end
@@ -459,100 +466,105 @@ if LP.Character then setupChar(LP.Character) end
 LP.CharacterAdded:Connect(setupChar)
 
 --// ==========================================
---// LOOP PRINCIPAL
+--// LOOP PRINCIPAL SEGURO
 --// ==========================================
-RS.RenderStepped:Connect(function(dt)
-    for _, p in ipairs(P:GetPlayers()) do
-        manageESP(p)
-    end
-
-    local char = LP.Character
-    local rp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-    if rp and hum then
-        if Config.FlyEnabled then
-            hum.PlatformStand = true
-            rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
-
-            local moveDir = hum.MoveDirection
-            local camCFrame = Cam.CFrame
-            local flyVector = Vector3.new()
-
-            if moveDir.Magnitude > 0 then
-                flyVector = Vector3.new(camCFrame.LookVector.X, camCFrame.LookVector.Y, camCFrame.LookVector.Z).Unit * moveDir.Magnitude
-            end
-
-            if UIS:IsKeyDown(Enum.KeyCode.Space) then
-                flyVector = flyVector + Vector3.new(0, 1, 0)
-            end
-            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
-                flyVector = flyVector + Vector3.new(0, -1, 0)
-            end
-
-            rp.CFrame = rp.CFrame + (flyVector * Config.FlySpeed * dt)
-        else
-            if not Config.KillAuraEnabled and not Config.PlaneKillAuraEnabled then
-                hum.PlatformStand = false
-            end
+RunService.RenderStepped:Connect(function(dt)
+    pcall(function()
+        for _, p in ipairs(Players:GetPlayers()) do
+            manageESP(p)
         end
 
-        if Config.KillAuraEnabled then
-            hum.PlatformStand = true
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
+        local char = LP.Character
+        local rp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
 
-            local targetFound = false
-            for _, p in ipairs(P:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
-                    local pRp = p.Character:FindFirstChild("HumanoidRootPart")
-                    if pHum and pHum.Health > 0 and pRp then
-                        if not Config.TeamCheck or p.Team ~= LP.Team then
-                            targetFound = true
-                            local targetPos = pRp.CFrame + Vector3.new(0, 6, 0)
-                            rp.CFrame = rp.CFrame:Lerp(targetPos, math.clamp(dt * 12, 0, 1))
-                            
-                            local tool = char:FindFirstChildOfClass("Tool")
-                            if tool then
-                                pcall(function() tool:Activate() end)
-                            end
-                            break
-                        end
-                    end
+        if rp and hum then
+            -- Voo
+            if Config.FlyEnabled then
+                hum.PlatformStand = true
+                rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+
+                local moveDir = hum.MoveDirection
+                local camCFrame = Cam.CFrame
+                local flyVector = Vector3.new()
+
+                if moveDir.Magnitude > 0 then
+                    flyVector = Vector3.new(camCFrame.LookVector.X, camCFrame.LookVector.Y, camCFrame.LookVector.Z).Unit * moveDir.Magnitude
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then
+                    flyVector = flyVector + Vector3.new(0, 1, 0)
+                end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+                    flyVector = flyVector + Vector3.new(0, -1, 0)
+                end
+
+                rp.CFrame = rp.CFrame + (flyVector * Config.FlySpeed * dt)
+            else
+                if not Config.KillAuraEnabled and not Config.PlaneKillAuraEnabled then
+                    hum.PlatformStand = false
                 end
             end
-            if not targetFound and not Config.FlyEnabled then
-                hum.PlatformStand = false
-            end
-        end
 
-        if Config.PlaneKillAuraEnabled then
-            for _, p in ipairs(P:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
-                    local pRp = p.Character:FindFirstChild("HumanoidRootPart")
-                    if pHum and pHum.Health > 0 and pRp then
-                        if not Config.TeamCheck or p.Team ~= LP.Team then
-                            rp.CFrame = pRp.CFrame + Vector3.new(0, 2, 0)
-                            local tool = char:FindFirstChildOfClass("Tool")
-                            if tool then
-                                pcall(function() tool:Activate() end)
+            -- Kill Aura Aéreo
+            if Config.KillAuraEnabled then
+                hum.PlatformStand = true
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+
+                local targetFound = false
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LP and p.Character then
+                        local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+                        local pRp = p.Character:FindFirstChild("HumanoidRootPart")
+                        if pHum and pHum.Health > 0 and pRp then
+                            if not Config.TeamCheck or p.Team ~= LP.Team then
+                                targetFound = true
+                                local targetPos = pRp.CFrame + Vector3.new(0, 6, 0)
+                                rp.CFrame = rp.CFrame:Lerp(targetPos, math.clamp(dt * 12, 0, 1))
+                                
+                                local tool = char:FindFirstChildOfClass("Tool")
+                                if tool then
+                                    pcall(function() tool:Activate() end)
+                                end
+                                break
                             end
                         end
                     end
                 end
+                if not targetFound and not Config.FlyEnabled then
+                    hum.PlatformStand = false
+                end
+            end
+
+            -- Kill Aura Avião (Varre todos no servidor instantaneamente)
+            if Config.PlaneKillAuraEnabled then
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LP and p.Character then
+                        local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+                        local pRp = p.Character:FindFirstChild("HumanoidRootPart")
+                        if pHum and pHum.Health > 0 and pRp then
+                            if not Config.TeamCheck or p.Team ~= LP.Team then
+                                rp.CFrame = pRp.CFrame + Vector3.new(0, 2, 0)
+                                local tool = char:FindFirstChildOfClass("Tool")
+                                if tool then
+                                    pcall(function() tool:Activate() end)
+                                end
+                            end
+                        end
+                    end
+                end
             end
         end
-    end
+    end)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Carregado!",
-    Content = "Interface e funções ativas com sucesso.",
+    Title = "Royality Hub Carregado com Sucesso!",
+    Content = "Todas as funções ativas e estabilizadas.",
     Duration = 4
 })
