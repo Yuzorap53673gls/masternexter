@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE FINAL V13 (COM AUTO-EXECUTE & ESP LONGO)
+--// ROYALITY HUB | ULTIMATE FINAL V14 (COM LOOT ESP + AUTO KIT + ANTENA)
 --// ==========================================
 
 -- Auto-Execute persistente ao mudar de partida/lobby
@@ -33,6 +33,9 @@ end
 -- Configurações Padrões Salvas para o Botão Reset
 getgenv().DefaultConfig = {
     ESPEnabled = true,
+    ESPAntenna = true, -- Novo: Antena vermelha no ESP Player
+    LootESPEnabled = false, -- Novo: ESP de Armas no mapa
+    AutoMedKit = false, -- Novo: Auto Kit Médico
     AimbotEnabled = true,
     TeamCheck = false,
     WallCheck = true,
@@ -50,6 +53,9 @@ getgenv().DefaultConfig = {
 
 getgenv().Config = {
     ESPEnabled = true,
+    ESPAntenna = true,
+    LootESPEnabled = false,
+    AutoMedKit = false,
     AimbotEnabled = true,
     TeamCheck = false,
     WallCheck = true,
@@ -88,7 +94,7 @@ end)
 
 --// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Final v13",
+    Name = "Royality Hub | Ultimate Final v14",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -97,7 +103,7 @@ local Window = Rayfield:CreateWindow({
 
 local T1 = Window:CreateTab("Combate & Aim", 4483362458)
 local T2 = Window:CreateTab("Voo & Movimento", 4483345998)
-local T3 = Window:CreateTab("Visual (ESP)", 4483345998)
+local T3 = Window:CreateTab("Visual (ESP & Loot)", 4483345998)
 local T4 = Window:CreateTab("Configurações", 4483345998)
 
 --// Aba Combate
@@ -174,6 +180,13 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
+    Name = "💊 Auto Kit Médico (Usa quando perde vida)",
+    CurrentValue = Config.AutoMedKit,
+    Flag = "AMK",
+    Callback = function(v) Config.AutoMedKit = v end
+})
+
+T1:CreateToggle({
     Name = "Ignorar Time (TeamCheck)",
     CurrentValue = Config.TeamCheck,
     Flag = "TC",
@@ -220,7 +233,7 @@ T2:CreateToggle({
     Callback = function(v) Config.KillAuraEnabled = v end
 })
 
---// Aba Visual (ESP)
+--// Aba Visual (ESP & Loot)
 T3:CreateToggle({
     Name = "👁️ Ativar ESP Destaque (Longo Alcance)",
     CurrentValue = Config.ESPEnabled,
@@ -228,7 +241,21 @@ T3:CreateToggle({
     Callback = function(v) Config.ESPEnabled = v end
 })
 
---// Aba Configurações (Com Botão de Reset)
+T3:CreateToggle({
+    Name = "📡 Ativar Antena Vermelha no Topo da Cabeça",
+    CurrentValue = Config.ESPAntenna,
+    Flag = "ANT",
+    Callback = function(v) Config.ESPAntenna = v end
+})
+
+T3:CreateToggle({
+    Name = "🟡 Ativar ESP de Armas / Loot no Mapa",
+    CurrentValue = Config.LootESPEnabled,
+    Flag = "LESP",
+    Callback = function(v) Config.LootESPEnabled = v end
+})
+
+--// Aba Configurações
 T4:CreateButton({
     Name = "🔄 Resetar Configurações para o Padrão",
     Callback = function()
@@ -244,7 +271,7 @@ T4:CreateButton({
 })
 
 --// ==========================================
---// FUNÇÃO DE VISIBILIDADE (WALLCHECK SEGURO)
+--// FUNÇÃO DE VISIBILIDADE (WALLCHECK)
 --// ==========================================
 local function isVisible(targetPart, targetCharacter)
     if not Config.WallCheck then return true end
@@ -263,7 +290,7 @@ local function isVisible(targetPart, targetCharacter)
 end
 
 --// ==========================================
---// LOOP PRINCIPAL DE COMBATE E ESP (LONGO ALCANCE)
+--// LOOP PRINCIPAL DE COMBATE, ESP, ANTENA & LOOT
 --// ==========================================
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
@@ -271,13 +298,16 @@ RunService.RenderStepped:Connect(function(dt)
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
 
-        -- ESP Manager (Longo Alcance + Cores Dinâmicas: Vermelho Vivo = Vivo / Azul = Morto ou Abatido)
+        -- 1. ESP de Jogadores (Longo Alcance + Cores + Antena Vermelha)
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LP and p.Character then
                 local char = p.Character
                 local hum = char:FindFirstChildOfClass("Humanoid")
+                local head = char:FindFirstChild("Head")
                 local hl = char:FindFirstChild("RoyESP")
+                local antenna = char:FindFirstChild("RoyAntenna")
                 
+                -- Highlight Principal
                 if Config.ESPEnabled and char then
                     if not hl then
                         hl = Instance.new("Highlight")
@@ -291,19 +321,95 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                     hl.Enabled = true
                     
-                    -- Verifica se está vivo ou morto/abatido para mudar a cor dinamicamente
                     if hum and hum.Health > 0 then
-                        hl.FillColor = Color3.fromRGB(255, 0, 0) -- Vermelho se estiver vivo
+                        hl.FillColor = Color3.fromRGB(255, 0, 0) -- Vermelho se vivo
                     else
-                        hl.FillColor = Color3.fromRGB(0, 100, 255) -- Azul se estiver morto ou abatido
+                        hl.FillColor = Color3.fromRGB(0, 100, 255) -- Azul se morto/abatido
                     end
                 elseif hl then
                     hl.Enabled = false
                 end
+
+                -- Antena Vermelha no Topo da Cabeça
+                if Config.ESPAntenna and head and hum and hum.Health > 0 then
+                    if not antenna then
+                        antenna = Instance.new("BillboardGui")
+                        antenna.Name = "RoyAntenna"
+                        antenna.Adornee = head
+                        antenna.Size = UDim2.new(0, 2, 0, 150)
+                        antenna.StudsOffset = Vector3.new(0, 8, 0)
+                        antenna.AlwaysOnTop = true
+                        antenna.Parent = head
+
+                        local line = Instance.new("Frame")
+                        line.Size = UDim2.new(1, 0, 1, 0)
+                        line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                        line.BorderSizePixel = 0
+                        line.Parent = antenna
+                    end
+                    antenna.Enabled = true
+                elseif antenna then
+                    antenna.Enabled = false
+                end
             end
         end
 
-        -- Aimbot Inteligente com WallCheck e Distância Máxima
+        -- 2. ESP de Armas / Loot Amarelo no Mapa
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if Config.LootESPEnabled and (obj:IsA("Tool") or obj.Name:lower():find("gun") or obj.Name:lower():find("weapon") or obj.Name:lower():find("ammo") or obj.Name:lower():find("medkit")) then
+                local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or (obj:IsA("BasePart") and obj)
+                if part then
+                    local lootHl = obj:FindFirstChild("RoyLootESP")
+                    if not lootHl then
+                        lootHl = Instance.new("Highlight")
+                        lootHl.Name = "RoyLootESP"
+                        lootHl.FillColor = Color3.fromRGB(255, 255, 0) -- Amarelo
+                        lootHl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        lootHl.FillTransparency = 0.4
+                        lootHl.Adornee = obj
+                        lootHl.Parent = obj
+
+                        local bill = Instance.new("BillboardGui")
+                        bill.Name = "RoyLootText"
+                        bill.Adornee = part
+                        bill.Size = UDim2.new(0, 100, 0, 30)
+                        bill.StudsOffset = Vector3.new(0, 2, 0)
+                        bill.AlwaysOnTop = true
+                        bill.Parent = part
+
+                        local txt = Instance.new("TextLabel")
+                        txt.Size = UDim2.new(1, 0, 1, 0)
+                        txt.BackgroundTransparency = 1
+                        txt.Text = obj.Name
+                        txt.TextColor3 = Color3.fromRGB(255, 255, 0)
+                        txt.TextStrokeTransparency = 0
+                        txt.TextSize = 13
+                        txt.Font = Enum.Font.GothamBold
+                        txt.Parent = bill
+                    end
+                    lootHl.Enabled = true
+                end
+            end
+        end
+
+        -- 3. Auto Kit Médico (Usa automaticamente se perder vida)
+        local char = LP.Character
+        local backpack = LP:FindFirstChildOfClass("Backpack")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
+            if backpack then
+                for _, tool in ipairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") and (tool.Name:lower():find("med") or tool.Name:lower():find("kit") or tool.Name:lower():find("heal") or tool.Name:lower():find("bandage")) then
+                        char.Humanoid:EquipTool(tool)
+                        task.wait(0.1)
+                        pcall(function() tool:Activate() end)
+                        break
+                    end
+                end
+            end
+        end
+
+        -- 4. Aimbot Inteligente com WallCheck e Distância Máxima
         if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
@@ -312,11 +418,11 @@ RunService.RenderStepped:Connect(function(dt)
 
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character and myRoot then
-                    local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
                     local part = p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
                     local rp = p.Character:FindFirstChild("HumanoidRootPart")
                     
-                    if hum and hum.Health > 0 and part and rp then
+                    if pHum and pHum.Health > 0 and part and rp then
                         if Config.TeamCheck and p.Team == LP.Team then continue end
                         
                         local worldDist = (rp.Position - myRoot.Position).Magnitude
@@ -343,9 +449,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Auto-Switch Weapon
-        local char = LP.Character
-        local backpack = LP:FindFirstChildOfClass("Backpack")
+        -- 5. Auto-Switch Weapon
         if Config.AutoSwitchEnabled and char and backpack then
             local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
@@ -361,9 +465,8 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Voo
+        -- 6. Voo
         local rp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
             rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -378,7 +481,7 @@ RunService.RenderStepped:Connect(function(dt)
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
-        -- Kill Aura
+        -- 7. Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -399,7 +502,7 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Concluído!",
-    Content = "Versão Final V13 Carregada com Sucesso.",
+    Title = "Royality Hub V14 Concluído!",
+    Content = "ESP Loot, Auto Kit e Antena Ativados com Sucesso.",
     Duration = 4
 })
