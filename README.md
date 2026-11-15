@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | DEFINITIVO + FLY CORRIGIDO + KILL AURA SUBTERRÂNEO
+--// ROYALITY HUB | DEFINITIVO + KILL AURA AÉREO FLUIDO + AIMBOT CERTEIRO
 --// ==========================================
 
 local s,R=pcall(function()return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()end)
@@ -14,15 +14,15 @@ getgenv().Config={
     TeamCheck=false,
     WallCheck=true,
     AimPart="Head",
-    FOVRadius=180, -- Aumentado para melhor detecção
-    MaxDistance=300,
+    FOVRadius=220, -- Raio amplo para garantir o tiro certo
+    MaxDistance=400,
     ShowCursor=true,
     RapidFireEnabled=true,
-    DamageMultiplier=3.0, -- Dano aumentado
-    AntiRecoilPower=4.0,  -- Anti-recoil forte
+    DamageMultiplier=3.0,
+    AntiRecoilPower=5.0,
     FlyEnabled=false,
     FlySpeed=70,
-    KillAuraEnabled=false -- Novo: Auto-Kill subterrâneo
+    KillAuraEnabled=false -- Kill Aura Aéreo Suave
 }
 
 local P=game:GetService("Players")
@@ -51,7 +51,7 @@ end)
 
 --// Janela Rayfield
 local W=R:CreateWindow({
-    Name="Royality Hub | Ultimate Corrigido",
+    Name="Royality Hub | Ultimate Corrigido v2",
     LoadingTitle="Carregando...",
     LoadingSubtitle="Delta Executor",
     ConfigurationSaving={Enabled=false},
@@ -64,7 +64,7 @@ local T3=W:CreateTab("Visual (ESP)",4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name="🎯 Silent Aim Potencializado (Tiro Certeiro)",
+    Name="🎯 Aimbot / Silent Aim Definitivo (Tiro na Cabeça)",
     CurrentValue=Config.SilentAimEnabled,
     Flag="SA",
     Callback=function(v)
@@ -74,7 +74,7 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
-    Name="💀 Kill Aura Subterrâneo (Mata Todos Automaticamente)",
+    Name="✈️ Kill Aura Aéreo (Voa até os inimigos e mata)",
     CurrentValue=Config.KillAuraEnabled,
     Flag="KA",
     Callback=function(v)
@@ -93,7 +93,7 @@ T1:CreateDropdown({
 })
 
 T1:CreateSlider({
-    Name="Força Anti-Recoil (Zera o Recuo)",
+    Name="Força Anti-Recoil",
     Range={1.0, 8.0},
     Increment=0.5,
     Suffix="x",
@@ -114,7 +114,7 @@ T1:CreateSlider({
 
 T1:CreateSlider({
     Name="Raio de Mira (FOV)",
-    Range={50,400},
+    Range={50,500},
     Increment=10,
     CurrentValue=Config.FOVRadius,
     Flag="FOV",
@@ -157,7 +157,7 @@ T1:CreateSlider({
 
 --// Aba Voo & Teleporte
 T2:CreateToggle({
-    Name="✈️ Ativar Voo Perfeito (Sobe, Desce e Anda)",
+    Name="✈️ Ativar Voo Perfeito",
     CurrentValue=Config.FlyEnabled,
     Flag="FT",
     Callback=function(v)
@@ -234,7 +234,7 @@ T3:CreateToggle({
 })
 
 --// ==========================================
---// LÓGICA DE ALVO E VISIBILIDADE
+--// LÓGICA DE ALVO E VISIBILIDADE CERTEIRA
 --// ==========================================
 local function isVisible(targetPart, targetChar)
     if not Config.WallCheck then return true end
@@ -288,7 +288,7 @@ local function getBestTarget()
 end
 
 --// ==========================================
---// SILENT AIM POTENCIALIZADO + ANTI-RECOIL
+--// SILENT AIM CERTEIRO (DIRETO NA CABEÇA)
 --// ==========================================
 local CurrentTargetPart=nil
 
@@ -297,8 +297,7 @@ oldIndex=hookmetamethod(game,"__index",newcclosure(function(self,key)
     if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
         if self==Mouse then
             if key=="Hit" then
-                -- Aplica compensação de recuo diretamente no destino do tiro
-                local finalPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.2, 0)
+                local finalPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.1, 0)
                 return CFrame.new(finalPos)
             elseif key=="Target" then
                 return CurrentTargetPart.Parent:FindFirstChild("Head") or CurrentTargetPart
@@ -315,7 +314,7 @@ oldNamecall=hookmetamethod(game,"__namecall",newcclosure(function(self,...)
     if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
         if self==workspace and method=="Raycast" and typeof(args[1])=="Vector3" and typeof(args[2])=="Vector3" then
             local origin=args[1]
-            local targetPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.2, 0)
+            local targetPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.1, 0)
             local dir=(targetPos-origin).Unit * args[2].Magnitude
             args[2]=dir
             return oldNamecall(self,unpack(args))
@@ -395,7 +394,7 @@ local function manageESP(p)
 end
 
 --// ==========================================
---// MODIFICAÇÃO DE ARMAS (RAPID FIRE + DANO)
+--// MODIFICAÇÃO DE ARMAS
 --// ==========================================
 local function modTool(t)
     if not t:IsA("Tool") then return end
@@ -424,10 +423,8 @@ if LP.Character then setupChar(LP.Character) end
 LP.CharacterAdded:Connect(setupChar)
 
 --// ==========================================
---// LOOP PRINCIPAL (FLY CORRIGIDO + KILL AURA SUBTERRÂNEO)
+--// LOOP PRINCIPAL (FLY + KILL AURA AÉREO SUAVE)
 --// ==========================================
-local lastKillAuraTick = 0
-
 RS.RenderStepped:Connect(function(dt)
     CurrentTargetPart=Config.SilentAimEnabled and getBestTarget() or nil
 
@@ -440,7 +437,7 @@ RS.RenderStepped:Connect(function(dt)
     local hum=char and char:FindFirstChildOfClass("Humanoid")
 
     if rp and hum then
-        -- 1. Fly Corrigido (Sobe, Desce e Direção da Câmera)
+        -- 1. Fly Perfeito
         if Config.FlyEnabled then
             hum.PlatformStand=true
             rp.AssemblyLinearVelocity=Vector3.new(0,0,0)
@@ -453,9 +450,6 @@ RS.RenderStepped:Connect(function(dt)
             local flyVector=Vector3.new()
 
             if moveDir.Magnitude>0 then
-                -- Converte a direção do analógico/teclado baseada para onde a câmera aponta (inclusive para cima/baixo)
-                flyVector = (camCFrame.LookVector * moveDir.Z * -1) + (camCFrame.RightVector * moveDir.X)
-                -- Se você olhar para cima e andar para frente, o fly vai para cima!
                 flyVector = Vector3.new(camCFrame.LookVector.X, camCFrame.LookVector.Y, camCFrame.LookVector.Z).Unit * moveDir.Magnitude
             end
 
@@ -473,34 +467,37 @@ RS.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- 2. Kill Aura Subterrâneo (Vai debaixo da terra e mata um por um)
+        -- 2. Kill Aura Aéreo Suave (Voa pelo ar até o inimigo sem flicar a tela)
         if Config.KillAuraEnabled then
             hum.PlatformStand=true
             for _,part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide=false end
             end
 
-            if tick() - lastKillAuraTick > 0.4 then -- Alterna de alvo a cada 0.4 segundos
-                lastKillAuraTick = tick()
-                for _,p in ipairs(P:GetPlayers()) do
-                    if p~=LP and p.Character then
-                        local pHum=p.Character:FindFirstChildOfClass("Humanoid")
-                        local pRp=p.Character:FindFirstChild("HumanoidRootPart")
-                        if pHum and pHum.Health>0 and pRp then
-                            if not Config.TeamCheck or p.Team~=LP.Team then
-                                -- Teleporta para embaixo da terra do oponente (-8 studs abaixo)
-                                rp.CFrame = pRp.CFrame * CFrame.new(0, -8, 0)
-                                
-                                -- Ativa a arma automaticamente para eliminar
-                                local tool = char:FindFirstChildOfClass("Tool")
-                                if tool then
-                                    pcall(function() tool:Activate() end)
-                                end
-                                break
+            local targetFound = false
+            for _,p in ipairs(P:GetPlayers()) do
+                if p~=LP and p.Character then
+                    local pHum=p.Character:FindFirstChildOfClass("Humanoid")
+                    local pRp=p.Character:FindFirstChild("HumanoidRootPart")
+                    if pHum and pHum.Health>0 and pRp then
+                        if not Config.TeamCheck or p.Team~=LP.Team then
+                            targetFound = true
+                            -- Voa suavemente por cima do inimigo (a 6 studs de altura)
+                            local targetPos = pRp.CFrame + Vector3.new(0, 6, 0)
+                            rp.CFrame = rp.CFrame:Lerp(targetPos, math.clamp(dt * 12, 0, 1))
+                            
+                            -- Ativa a arma automaticamente
+                            local tool = char:FindFirstChildOfClass("Tool")
+                            if tool then
+                                pcall(function() tool:Activate() end)
                             end
+                            break
                         end
                     end
                 end
+            end
+            if not targetFound and not Config.FlyEnabled then
+                hum.PlatformStand = false
             end
         end
     end
@@ -508,6 +505,6 @@ end)
 
 R:Notify({
     Title="Royality Hub Atualizado!",
-    Content="Fly Corrigido, Aimbot Potencializado e Kill Aura Ativos.",
+    Content="Kill Aura Aéreo e Aimbot Certeiro Ativados.",
     Duration=4
 })
