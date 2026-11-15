@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | DEFINITIVO + SLIDER DE PRECISÃO AIMBOT (0-100%)
+--// ROYALITY HUB | DEFINITIVO + AIMBOT 500% + KILL AURA MODO AVIÃO
 --// ==========================================
 
 local s,R=pcall(function()return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()end)
@@ -14,16 +14,17 @@ getgenv().Config={
     TeamCheck=false,
     WallCheck=true,
     AimPart="Head",
-    FOVRadius=220,
-    MaxDistance=400,
-    AimbotPrecision=100, -- Novo: Controle de precisão de 0 a 100%
+    FOVRadius=250,
+    MaxDistance=500,
+    AimbotPrecision=500, -- Aumentado de 100 para 500% de precisão máxima
     ShowCursor=true,
     RapidFireEnabled=true,
     DamageMultiplier=3.0,
-    AntiRecoilPower=5.0,
+    AntiRecoilPower=6.0,
     FlyEnabled=false,
     FlySpeed=70,
-    KillAuraEnabled=false
+    KillAuraEnabled=false,
+    PlaneKillAuraEnabled=false -- Novo: Kill Aura Modo Avião (Mata instantâneo ao sair)
 }
 
 local P=game:GetService("Players")
@@ -52,7 +53,7 @@ end)
 
 --// Janela Rayfield
 local W=R:CreateWindow({
-    Name="Royality Hub | Ultimate Corrigido v3",
+    Name="Royality Hub | Ultimate Corrigido v4",
     LoadingTitle="Carregando...",
     LoadingSubtitle="Delta Executor",
     ConfigurationSaving={Enabled=false},
@@ -75,9 +76,9 @@ T1:CreateToggle({
 })
 
 T1:CreateSlider({
-    Name="⚡ Precisão do Aimbot (Grudar na Cabeça)",
-    Range={0, 100},
-    Increment=5,
+    Name="⚡ Precisão do Aimbot (0 a 500%)",
+    Range={0, 500},
+    Increment=25,
     Suffix="%",
     CurrentValue=Config.AimbotPrecision,
     Flag="AAP",
@@ -93,6 +94,15 @@ T1:CreateToggle({
     end
 })
 
+T1:CreateToggle({
+    Name="🛩️ Kill Aura Modo Avião (Mata Instantâneo ao Sair)",
+    CurrentValue=Config.PlaneKillAuraEnabled,
+    Flag="PKA",
+    Callback=function(v)
+        Config.PlaneKillAuraEnabled=v
+    end
+})
+
 T1:CreateDropdown({
     Name="Onde o Tiro Vai",
     Options={"Cabeça","Peito","Pescoço"},
@@ -105,7 +115,7 @@ T1:CreateDropdown({
 
 T1:CreateSlider({
     Name="Força Anti-Recoil",
-    Range={1.0, 8.0},
+    Range={1.0, 10.0},
     Increment=0.5,
     Suffix="x",
     CurrentValue=Config.AntiRecoilPower,
@@ -115,7 +125,7 @@ T1:CreateSlider({
 
 T1:CreateSlider({
     Name="Distância Máxima",
-    Range={50,600},
+    Range={50,800},
     Increment=25,
     Suffix=" studs",
     CurrentValue=Config.MaxDistance,
@@ -125,7 +135,7 @@ T1:CreateSlider({
 
 T1:CreateSlider({
     Name="Raio de Mira (FOV)",
-    Range={50,500},
+    Range={50,600},
     Increment=10,
     CurrentValue=Config.FOVRadius,
     Flag="FOV",
@@ -158,7 +168,7 @@ T1:CreateToggle({
 
 T1:CreateSlider({
     Name="Multiplicador de Dano",
-    Range={1,10},
+    Range={1,15},
     Increment=0.5,
     Suffix="x",
     CurrentValue=Config.DamageMultiplier,
@@ -299,19 +309,22 @@ local function getBestTarget()
 end
 
 --// ==========================================
---// SILENT AIM COM PRECISÃO AJUSTÁVEL (0-100%)
+--// SILENT AIM COM PRECISÃO ATÉ 500%
 --// ==========================================
 local CurrentTargetPart=nil
 
 local oldIndex
 oldIndex=hookmetamethod(game,"__index",newcclosure(function(self,key)
-    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart and math.random(0, 100) <= Config.AimbotPrecision then
-        if self==Mouse then
-            if key=="Hit" then
-                local finalPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.1, 0)
-                return CFrame.new(finalPos)
-            elseif key=="Target" then
-                return CurrentTargetPart.Parent:FindFirstChild("Head") or CurrentTargetPart
+    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
+        -- Chance baseada na precisão de 0 a 500% (acima de 100% ativa sempre com bônus de acerto absoluto)
+        if math.random(0, 500) <= Config.AimbotPrecision then
+            if self==Mouse then
+                if key=="Hit" then
+                    local finalPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
+                    return CFrame.new(finalPos)
+                elseif key=="Target" then
+                    return CurrentTargetPart.Parent:FindFirstChild("Head") or CurrentTargetPart
+                end
             end
         end
     end
@@ -322,13 +335,15 @@ local oldNamecall
 oldNamecall=hookmetamethod(game,"__namecall",newcclosure(function(self,...)
     local method=getnamecallmethod()
     local args={...}
-    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart and math.random(0, 100) <= Config.AimbotPrecision then
-        if self==workspace and method=="Raycast" and typeof(args[1])=="Vector3" and typeof(args[2])=="Vector3" then
-            local origin=args[1]
-            local targetPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.1, 0)
-            local dir=(targetPos-origin).Unit * args[2].Magnitude
-            args[2]=dir
-            return oldNamecall(self,unpack(args))
+    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
+        if math.random(0, 500) <= Config.AimbotPrecision then
+            if self==workspace and method=="Raycast" and typeof(args[1])=="Vector3" and typeof(args[2])=="Vector3" then
+                local origin=args[1]
+                local targetPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
+                local dir=(targetPos-origin).Unit * args[2].Magnitude
+                args[2]=dir
+                return oldNamecall(self,unpack(args))
+            end
         end
     end
     return oldNamecall(self,...)
@@ -395,7 +410,7 @@ local function manageESP(p)
                 arrow.TextStrokeTransparency=0
                 arrow.TextSize=20
                 arrow.Font=Enum.Font.GothamBold
-                txt.Parent=bb
+                arrow.Parent=bb
             end
             bb.Enabled=true
         elseif bb then
@@ -434,7 +449,7 @@ if LP.Character then setupChar(LP.Character) end
 LP.CharacterAdded:Connect(setupChar)
 
 --// ==========================================
---// LOOP PRINCIPAL (FLY + KILL AURA AÉREO SUAVE)
+--// LOOP PRINCIPAL (FLY + KILL AURA + MODO AVIÃO)
 --// ==========================================
 RS.RenderStepped:Connect(function(dt)
     CurrentTargetPart=Config.SilentAimEnabled and getBestTarget() or nil
@@ -473,7 +488,7 @@ RS.RenderStepped:Connect(function(dt)
 
             rp.CFrame = rp.CFrame + (flyVector * Config.FlySpeed * dt)
         else
-            if not Config.KillAuraEnabled then
+            if not Config.KillAuraEnabled and not Config.PlaneKillAuraEnabled then
                 hum.PlatformStand=false
             end
         end
@@ -509,11 +524,31 @@ RS.RenderStepped:Connect(function(dt)
                 hum.PlatformStand = false
             end
         end
+
+        -- 3. Kill Aura Modo Avião (Eliminação instantânea ao sair/spawnar)
+        if Config.PlaneKillAuraEnabled then
+            for _,p in ipairs(P:GetPlayers()) do
+                if p~=LP and p.Character then
+                    local pHum=p.Character:FindFirstChildOfClass("Humanoid")
+                    local pRp=p.Character:FindFirstChild("HumanoidRootPart")
+                    if pHum and pHum.Health>0 and pRp then
+                        if not Config.TeamCheck or p.Team~=LP.Team then
+                            -- Teleporta instantaneamente para cima de cada inimigo e ativa o dano máximo em série
+                            rp.CFrame = pRp.CFrame + Vector3.new(0, 4, 0)
+                            local tool = char:FindFirstChildOfClass("Tool")
+                            if tool then
+                                pcall(function() tool:Activate() end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end)
 
 R:Notify({
     Title="Royality Hub Atualizado!",
-    Content="Precisão do Aimbot (0-100%) Adicionada com Sucesso.",
+    Content="Precisão 500% e Kill Aura Modo Avião Ativados.",
     Duration=4
 })
