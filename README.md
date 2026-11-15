@@ -1,6 +1,15 @@
 --// ==========================================
---// ROYALITY HUB | AIMBOT INTELIGENTE COM WALLCHECK + DISTÂNCIA
+--// ROYALITY HUB | ULTIMATE FINAL V13 (COM AUTO-EXECUTE & ESP LONGO)
 --// ==========================================
+
+-- Auto-Execute persistente ao mudar de partida/lobby
+pcall(function()
+    if syn and syn.queue_on_teleport then
+        syn.queue_on_teleport(game:HttpGet("SEU_LINK_OU_SCRIPT_AQUI"))
+    elseif queue_on_teleport then
+        queue_on_teleport(game:HttpGet("SEU_LINK_OU_SCRIPT_AQUI"))
+    end
+end)
 
 local Success, Rayfield = pcall(function()
     return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -21,12 +30,30 @@ if not Rayfield then
     return
 end
 
+-- Configurações Padrões Salvas para o Botão Reset
+getgenv().DefaultConfig = {
+    ESPEnabled = true,
+    AimbotEnabled = true,
+    TeamCheck = false,
+    WallCheck = true,
+    MaxAimDistance = 250,
+    AimPart = "Head",
+    FOVRadius = 400,
+    AimbotStrength = 15,
+    RapidFireEnabled = false,
+    AutoSwitchEnabled = false,
+    DamageMultiplier = 3.0,
+    FlyEnabled = false,
+    FlySpeed = 60,
+    KillAuraEnabled = false
+}
+
 getgenv().Config = {
     ESPEnabled = true,
     AimbotEnabled = true,
     TeamCheck = false,
-    WallCheck = true, -- Novo: Não puxa se estiver atrás da parede
-    MaxAimDistance = 250, -- Novo: Distância máxima em studs para o aimbot grudar (ignora longe)
+    WallCheck = true,
+    MaxAimDistance = 250,
     AimPart = "Head",
     FOVRadius = 400,
     AimbotStrength = 15,
@@ -61,7 +88,7 @@ end)
 
 --// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Final v12",
+    Name = "Royality Hub | Ultimate Final v13",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -71,6 +98,7 @@ local Window = Rayfield:CreateWindow({
 local T1 = Window:CreateTab("Combate & Aim", 4483362458)
 local T2 = Window:CreateTab("Voo & Movimento", 4483345998)
 local T3 = Window:CreateTab("Visual (ESP)", 4483345998)
+local T4 = Window:CreateTab("Configurações", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
@@ -194,10 +222,25 @@ T2:CreateToggle({
 
 --// Aba Visual (ESP)
 T3:CreateToggle({
-    Name = "👁️ Ativar ESP Destaque",
+    Name = "👁️ Ativar ESP Destaque (Longo Alcance)",
     CurrentValue = Config.ESPEnabled,
     Flag = "ESP",
     Callback = function(v) Config.ESPEnabled = v end
+})
+
+--// Aba Configurações (Com Botão de Reset)
+T4:CreateButton({
+    Name = "🔄 Resetar Configurações para o Padrão",
+    Callback = function()
+        for k, v in pairs(DefaultConfig) do
+            Config[k] = v
+        end
+        Rayfield:Notify({
+            Title = "Resetado!",
+            Content = "Todas as configurações voltaram ao padrão.",
+            Duration = 3
+        })
+    end
 })
 
 --// ==========================================
@@ -220,7 +263,7 @@ local function isVisible(targetPart, targetCharacter)
 end
 
 --// ==========================================
---// LOOP PRINCIPAL DE COMBATE
+--// LOOP PRINCIPAL DE COMBATE E ESP (LONGO ALCANCE)
 --// ==========================================
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
@@ -228,22 +271,32 @@ RunService.RenderStepped:Connect(function(dt)
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
 
-        -- ESP Manager
+        -- ESP Manager (Longo Alcance + Cores Dinâmicas: Vermelho Vivo = Vivo / Azul = Morto ou Abatido)
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LP and p.Character then
                 local char = p.Character
+                local hum = char:FindFirstChildOfClass("Humanoid")
                 local hl = char:FindFirstChild("RoyESP")
-                if Config.ESPEnabled and char:FindFirstChildOfClass("Humanoid") and char:FindFirstChildOfClass("Humanoid").Health > 0 then
+                
+                if Config.ESPEnabled and char then
                     if not hl then
                         hl = Instance.new("Highlight")
                         hl.Name = "RoyESP"
-                        hl.FillColor = Color3.fromRGB(255, 0, 0)
                         hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                         hl.FillTransparency = 0.5
+                        hl.OutlineTransparency = 0
+                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                         hl.Adornee = char
                         hl.Parent = char
                     end
                     hl.Enabled = true
+                    
+                    -- Verifica se está vivo ou morto/abatido para mudar a cor dinamicamente
+                    if hum and hum.Health > 0 then
+                        hl.FillColor = Color3.fromRGB(255, 0, 0) -- Vermelho se estiver vivo
+                    else
+                        hl.FillColor = Color3.fromRGB(0, 100, 255) -- Azul se estiver morto ou abatido
+                    end
                 elseif hl then
                     hl.Enabled = false
                 end
@@ -266,10 +319,8 @@ RunService.RenderStepped:Connect(function(dt)
                     if hum and hum.Health > 0 and part and rp then
                         if Config.TeamCheck and p.Team == LP.Team then continue end
                         
-                        -- Verifica a distância máxima
                         local worldDist = (rp.Position - myRoot.Position).Magnitude
                         if worldDist <= Config.MaxAimDistance then
-                            -- Verifica se está visível na tela e sem parede na frente
                             local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
                             if onScreen and isVisible(part, p.Character) then
                                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
@@ -348,7 +399,7 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Finalizado!",
-    Content = "WallCheck e Distância Máxima Ativados com Sucesso.",
+    Title = "Royality Hub Concluído!",
+    Content = "Versão Final V13 Carregada com Sucesso.",
     Duration = 4
 })
