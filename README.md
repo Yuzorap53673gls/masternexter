@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | DEFINITIVO + KILL AURA MODO AVIÃO CORRIGIDO
+--// ROYALITY HUB | ULTIMATE + KILL AURA AVIÃO DIRETO + AIMBOT NO TALO (500%)
 --// ==========================================
 
 local s,R=pcall(function()return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()end)
@@ -12,19 +12,19 @@ getgenv().Config={
     ESPEnabled=true,
     SilentAimEnabled=true,
     TeamCheck=false,
-    WallCheck=true,
+    WallCheck=false, -- Desativado no modo agressivo para garantir o tiro em qualquer lugar
     AimPart="Head",
-    FOVRadius=250,
-    MaxDistance=500,
+    FOVRadius=400,   -- FOV ultra largo para pegar qualquer um na tela
+    MaxDistance=1000, -- Alcance máximo
     AimbotPrecision=500,
     ShowCursor=true,
     RapidFireEnabled=true,
-    DamageMultiplier=3.0,
-    AntiRecoilPower=6.0,
+    DamageMultiplier=5.0,
+    AntiRecoilPower=10.0,
     FlyEnabled=false,
-    FlySpeed=70,
+    FlySpeed=80,
     KillAuraEnabled=false,
-    PlaneKillAuraEnabled=false -- Kill Aura Modo Avião Definitivo (Ativa ao sair do avião)
+    PlaneKillAuraEnabled=false -- Mata todos no avião/partida instantaneamente ao ligar
 }
 
 local P=game:GetService("Players")
@@ -43,8 +43,8 @@ pcall(function()
         FC=Drawing.new("Circle")
         FC.Visible=true
         FC.Transparency=0.6
-        FC.Color=Color3.fromRGB(255,50,50)
-        FC.Thickness=1.5
+        FC.Color=Color3.fromRGB(255,0,0)
+        FC.Thickness=2
         FC.NumSides=64
         FC.Radius=Config.FOVRadius
         FC.Filled=false
@@ -53,7 +53,7 @@ end)
 
 --// Janela Rayfield
 local W=R:CreateWindow({
-    Name="Royality Hub | Ultimate Corrigido v5",
+    Name="Royality Hub | Ultimate Definitivo v6",
     LoadingTitle="Carregando...",
     LoadingSubtitle="Delta Executor",
     ConfigurationSaving={Enabled=false},
@@ -66,7 +66,7 @@ local T3=W:CreateTab("Visual (ESP)",4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name="🎯 Aimbot / Silent Aim Definitivo",
+    Name="🎯 Aimbot Talo na Cabeça (100% Certeiro)",
     CurrentValue=Config.SilentAimEnabled,
     Flag="SA",
     Callback=function(v)
@@ -76,9 +76,9 @@ T1:CreateToggle({
 })
 
 T1:CreateSlider({
-    Name="⚡ Precisão do Aimbot (0 a 500%)",
-    Range={0, 500},
-    Increment=25,
+    Name="⚡ Precisão do Aimbot (500%)",
+    Range={100, 500},
+    Increment=50,
     Suffix="%",
     CurrentValue=Config.AimbotPrecision,
     Flag="AAP",
@@ -86,7 +86,7 @@ T1:CreateSlider({
 })
 
 T1:CreateToggle({
-    Name="✈️ Kill Aura Aéreo (Voa até os inimigos e mata)",
+    Name="✈️ Kill Aura Aéreo (Comum)",
     CurrentValue=Config.KillAuraEnabled,
     Flag="KA",
     Callback=function(v)
@@ -95,7 +95,7 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
-    Name="🛩️ Kill Aura Modo Avião (Mata Todos ao Sair)",
+    Name="🛩️ Kill Aura Avião (Mata Todos no Servidor)",
     CurrentValue=Config.PlaneKillAuraEnabled,
     Flag="PKA",
     Callback=function(v)
@@ -115,7 +115,7 @@ T1:CreateDropdown({
 
 T1:CreateSlider({
     Name="Força Anti-Recoil",
-    Range={1.0, 10.0},
+    Range={1.0, 15.0},
     Increment=0.5,
     Suffix="x",
     CurrentValue=Config.AntiRecoilPower,
@@ -124,9 +124,9 @@ T1:CreateSlider({
 })
 
 T1:CreateSlider({
-    Name="Distância Máxima",
-    Range={50,800},
-    Increment=25,
+    Name="Distância Máxima do Aimbot",
+    Range={100,2000},
+    Increment=50,
     Suffix=" studs",
     CurrentValue=Config.MaxDistance,
     Flag="MD",
@@ -135,21 +135,14 @@ T1:CreateSlider({
 
 T1:CreateSlider({
     Name="Raio de Mira (FOV)",
-    Range={50,600},
-    Increment=10,
+    Range={100,1000},
+    Increment=25,
     CurrentValue=Config.FOVRadius,
     Flag="FOV",
     Callback=function(v)
         Config.FOVRadius=v
         if FC then FC.Radius=v end
     end
-})
-
-T1:CreateToggle({
-    Name="🧱 WallCheck (Apenas Visíveis)",
-    CurrentValue=Config.WallCheck,
-    Flag="WC",
-    Callback=function(v) Config.WallCheck=v end
 })
 
 T1:CreateToggle({
@@ -168,8 +161,8 @@ T1:CreateToggle({
 
 T1:CreateSlider({
     Name="Multiplicador de Dano",
-    Range={1,15},
-    Increment=0.5,
+    Range={1,20},
+    Increment=1,
     Suffix="x",
     CurrentValue=Config.DamageMultiplier,
     Flag="DM",
@@ -255,25 +248,11 @@ T3:CreateToggle({
 })
 
 --// ==========================================
---// LÓGICA DE ALVO E VISIBILIDADE
+--// BUSCA DE ALVO ABSOLUTA (GARANTE O AIMBOT NA CABEÇA)
 --// ==========================================
-local function isVisible(targetPart, targetChar)
-    if not Config.WallCheck then return true end
-    local origin=Cam.CFrame.Position
-    local direction=(targetPart.Position-origin)
-    local params=RaycastParams.new()
-    params.FilterType=Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances={LP.Character,Cam}
-    local result=workspace:Raycast(origin,direction,params)
-    if result then
-        return result.Instance:IsDescendantOf(targetChar)
-    end
-    return true
-end
-
 local function getBestTarget()
     local closestPart=nil
-    local shortestScreenDist=Config.FOVRadius
+    local shortestDist=math.huge
     local screenCenter=Vector2.new(Cam.ViewportSize.X/2,Cam.ViewportSize.Y/2)
     if FC then FC.Position=screenCenter end
 
@@ -288,18 +267,31 @@ local function getBestTarget()
             if hum and hum.Health>0 and rp then
                 if Config.TeamCheck and p.Team==LP.Team then continue end
 
-                local worldDist=(rp.Position-myRoot.Position).Magnitude
-                if worldDist<=Config.MaxDistance then
+                local aimPart=p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
+                if aimPart then
+                    local screenPos,onScreen=Cam:WorldToViewportPoint(aimPart.Position)
+                    -- Mesmo que esteja um pouco fora do FOV, com 500% ele puxa direto para o alvo mais próximo
+                    local dist=(Vector2.new(screenPos.X,screenPos.Y)-screenCenter).Magnitude
+                    if dist <= Config.FOVRadius and dist < shortestDist then
+                        shortestDist = dist
+                        closestPart = aimPart
+                    end
+                end
+            end
+        end
+    end
+    -- Se não achar no FOV, pega o inimigo vivo mais próximo no mapa inteiro para garantir 100% de acerto
+    if not closestPart then
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                local hum=p.Character:FindFirstChildOfClass("Humanoid")
+                local rp=p.Character:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health>0 and rp then
+                    if Config.TeamCheck and p.Team==LP.Team then continue end
                     local aimPart=p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
                     if aimPart then
-                        local screenPos,onScreen=Cam:WorldToViewportPoint(aimPart.Position)
-                        if onScreen and screenPos.Z>0 then
-                            local distFromCrosshair=(Vector2.new(screenPos.X,screenPos.Y)-screenCenter).Magnitude
-                            if distFromCrosshair<shortestScreenDist and isVisible(aimPart,p.Character) then
-                                shortestScreenDist=distFromCrosshair
-                                closestPart=aimPart
-                            end
-                        end
+                        closestPart = aimPart
+                        break
                     end
                 end
             end
@@ -309,20 +301,18 @@ local function getBestTarget()
 end
 
 --// ==========================================
---// SILENT AIM COM PRECISÃO ATÉ 500%
+--// SILENT AIM DEFINITIVO (DIRETO NA CABEÇA SEM ERRO)
 --// ==========================================
-local CurrentTargetPart=nil
-
 local oldIndex
 oldIndex=hookmetamethod(game,"__index",newcclosure(function(self,key)
-    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
-        if math.random(0, 500) <= Config.AimbotPrecision then
+    if not checkcaller() and Config.SilentAimEnabled then
+        local target = getBestTarget()
+        if target then
             if self==Mouse then
                 if key=="Hit" then
-                    local finalPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
-                    return CFrame.new(finalPos)
+                    return CFrame.new(target.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0))
                 elseif key=="Target" then
-                    return CurrentTargetPart.Parent:FindFirstChild("Head") or CurrentTargetPart
+                    return target.Parent:FindFirstChild("Head") or target
                 end
             end
         end
@@ -334,11 +324,12 @@ local oldNamecall
 oldNamecall=hookmetamethod(game,"__namecall",newcclosure(function(self,...)
     local method=getnamecallmethod()
     local args={...}
-    if not checkcaller() and Config.SilentAimEnabled and CurrentTargetPart then
-        if math.random(0, 500) <= Config.AimbotPrecision then
+    if not checkcaller() and Config.SilentAimEnabled then
+        local target = getBestTarget()
+        if target then
             if self==workspace and method=="Raycast" and typeof(args[1])=="Vector3" and typeof(args[2])=="Vector3" then
                 local origin=args[1]
-                local targetPos = CurrentTargetPart.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
+                local targetPos = target.Position - Vector3.new(0, Config.AntiRecoilPower * 0.05, 0)
                 local dir=(targetPos-origin).Unit * args[2].Magnitude
                 args[2]=dir
                 return oldNamecall(self,unpack(args))
@@ -448,11 +439,9 @@ if LP.Character then setupChar(LP.Character) end
 LP.CharacterAdded:Connect(setupChar)
 
 --// ==========================================
---// LOOP PRINCIPAL (FLY + KILL AURA + MODO AVIÃO CORRIGIDO)
+--// LOOP PRINCIPAL (FLY + KILL AURAS)
 --// ==========================================
 RS.RenderStepped:Connect(function(dt)
-    CurrentTargetPart=Config.SilentAimEnabled and getBestTarget() or nil
-
     for _,p in ipairs(P:GetPlayers()) do
         manageESP(p)
     end
@@ -492,7 +481,7 @@ RS.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- 2. Kill Aura Aéreo Suave
+        -- 2. Kill Aura Aéreo Comum
         if Config.KillAuraEnabled then
             hum.PlatformStand=true
             for _,part in ipairs(char:GetDescendants()) do
@@ -524,22 +513,19 @@ RS.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- 3. Kill Aura Modo Avião Definitivo (Monitora e elimina todos ao sair da queda livre / avião)
+        -- 3. Kill Aura Avião (Mata todos no servidor instantaneamente ao ligar a chave)
         if Config.PlaneKillAuraEnabled then
-            -- Verifica se você ou os oponentes saíram do avião (quando o State é Freefall ou Pulou)
-            if hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping or rp.Position.Y < 400 then
-                for _,p in ipairs(P:GetPlayers()) do
-                    if p~=LP and p.Character then
-                        local pHum=p.Character:FindFirstChildOfClass("Humanoid")
-                        local pRp=p.Character:FindFirstChild("HumanoidRootPart")
-                        if pHum and pHum.Health>0 and pRp then
-                            if not Config.TeamCheck or p.Team~=LP.Team then
-                                -- Teletransporte relâmpago para cima de cada inimigo em massa
-                                rp.CFrame = pRp.CFrame + Vector3.new(0, 3, 0)
-                                local tool = char:FindFirstChildOfClass("Tool")
-                                if tool then
-                                    pcall(function() tool:Activate() end)
-                                end
+            for _,p in ipairs(P:GetPlayers()) do
+                if p~=LP and p.Character then
+                    local pHum=p.Character:FindFirstChildOfClass("Humanoid")
+                    local pRp=p.Character:FindFirstChild("HumanoidRootPart")
+                    if pHum and pHum.Health>0 and pRp then
+                        if not Config.TeamCheck or p.Team~=LP.Team then
+                            -- Teletransporte relâmpago direto na cabeça/corpo de cada player no servidor e dispara
+                            rp.CFrame = pRp.CFrame + Vector3.new(0, 2, 0)
+                            local tool = char:FindFirstChildOfClass("Tool")
+                            if tool then
+                                pcall(function() tool:Activate() end)
                             end
                         end
                     end
@@ -551,6 +537,6 @@ end)
 
 R:Notify({
     Title="Royality Hub Atualizado!",
-    Content="Kill Aura Modo Avião Definitivo Ativado.",
+    Content="Kill Aura Avião Direto e Aimbot 500% Ativados.",
     Duration=4
 })
