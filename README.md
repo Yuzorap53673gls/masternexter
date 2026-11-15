@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | VERSÃO ANTI-CRASH & ESTÁVEL
+--// ROYALITY HUB | VERSÃO FINAL COM AIMBOT FORTE + AUTO-SWITCH + RAPID FIRE
 --// ==========================================
 
 local Success, Rayfield = pcall(function()
@@ -26,9 +26,10 @@ getgenv().Config = {
     AimbotEnabled = true,
     TeamCheck = false,
     AimPart = "Head",
-    FOVRadius = 300,
-    MaxDistance = 1500,
-    RapidFireEnabled = true,
+    FOVRadius = 400,
+    AimbotStrength = 10, -- Força brutal para grudar na cabeça
+    RapidFireEnabled = false,
+    AutoSwitchEnabled = false, -- Novo: Troca de arma automática ao descarregar
     DamageMultiplier = 3.0,
     FlyEnabled = false,
     FlySpeed = 60,
@@ -58,7 +59,7 @@ end)
 
 --// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Anti-Crash v9",
+    Name = "Royality Hub | Ultimate Final v10",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -71,13 +72,22 @@ local T3 = Window:CreateTab("Visual (ESP)", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "🎯 Assistência de Mira (Aimbot Suave)",
+    Name = "🎯 Aimbot Imortal (Grude Forte na Cabeça)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
         Config.AimbotEnabled = v
         if FOVCircle then FOVCircle.Visible = v end
     end
+})
+
+T1:CreateSlider({
+    Name = "Força de Puxada do Aimbot",
+    Range = {1, 20},
+    Increment = 1,
+    CurrentValue = Config.AimbotStrength,
+    Flag = "ABS",
+    Callback = function(v) Config.AimbotStrength = v end
 })
 
 T1:CreateDropdown({
@@ -92,7 +102,7 @@ T1:CreateDropdown({
 
 T1:CreateSlider({
     Name = "Raio de Mira (FOV)",
-    Range = {50, 600},
+    Range = {50, 800},
     Increment = 25,
     CurrentValue = Config.FOVRadius,
     Flag = "FOV",
@@ -103,17 +113,24 @@ T1:CreateSlider({
 })
 
 T1:CreateToggle({
+    Name = "⚡ Ativar Rapid Fire (Recarga/Disparo Rápido)",
+    CurrentValue = Config.RapidFireEnabled,
+    Flag = "RF",
+    Callback = function(v) Config.RapidFireEnabled = v end
+})
+
+T1:CreateToggle({
+    Name = "🔄 Trocar Arma Automático (Ao Descarregar)",
+    CurrentValue = Config.AutoSwitchEnabled,
+    Flag = "AS",
+    Callback = function(v) Config.AutoSwitchEnabled = v end
+})
+
+T1:CreateToggle({
     Name = "Ignorar Time (TeamCheck)",
     CurrentValue = Config.TeamCheck,
     Flag = "TC",
     Callback = function(v) Config.TeamCheck = v end
-})
-
-T1:CreateToggle({
-    Name = "Rapid Fire Seguro",
-    CurrentValue = Config.RapidFireEnabled,
-    Flag = "RF",
-    Callback = function(v) Config.RapidFireEnabled = v end
 })
 
 T1:CreateSlider({
@@ -165,9 +182,9 @@ T3:CreateToggle({
 })
 
 --// ==========================================
---// SISTEMA DE AIMBOT SUAVE (SEM CRASH/BAN)
+--// SISTEMA DE AUTOMATIZAÇÃO E AIMBOT
 --// ==========================================
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
@@ -195,8 +212,8 @@ RunService.RenderStepped:Connect(function()
             end
         end
 
-        -- Aimbot Suave e Seguro para a Câmera
-        if Config.AimbotEnabled and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        -- Aimbot Imortal (Grude Forte com Re-Lock Automático)
+        if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
@@ -204,7 +221,7 @@ RunService.RenderStepped:Connect(function()
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
                     local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                    local part = p.Character:FindFirstChild(Config.AimPart)
+                    local part = p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
                     if hum and hum.Health > 0 and part then
                         if Config.TeamCheck and p.Team == LP.Team then continue end
                         local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
@@ -219,13 +236,33 @@ RunService.RenderStepped:Connect(function()
                 end
             end
 
+            -- Se houver alvo no raio, trava a câmera com força máxima ajustável
             if closestTarget then
-                Cam.CFrame = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
+                local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
+                Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.1, 1))
             end
         end
 
-        -- Voo Seguro
+        -- Auto-Switch Weapon (Troca de arma automática se descarregar)
         local char = LP.Character
+        local backpack = LP:FindFirstChildOfClass("Backpack")
+        if Config.AutoSwitchEnabled and char and backpack then
+            local currentTool = char:FindFirstChildOfClass("Tool")
+            if currentTool then
+                local ammoVal = currentTool:FindFirstChild("Ammo") or currentTool:FindFirstChild("Clip") or currentTool:FindFirstChild("Bullets")
+                if ammoVal and ammoVal.Value <= 0 then
+                    -- Procura outra arma no inventário para equipar
+                    for _, tool in ipairs(backpack:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            char.Humanoid:EquipTool(tool)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Voo
         local rp = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if rp and hum and Config.FlyEnabled then
@@ -239,10 +276,10 @@ RunService.RenderStepped:Connect(function()
             end
             if UIS:IsKeyDown(Enum.KeyCode.Space) then flyVec = flyVec + Vector3.new(0, 1, 0) end
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then flyVec = flyVec + Vector3.new(0, -1, 0) end
-            rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * RunService.RenderStepped:Wait())
+            rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
-        -- Kill Aura Seguro
+        -- Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -263,7 +300,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Carregado!",
-    Content = "Modo Estável Anti-Crash Ativado com Sucesso.",
+    Title = "Royality Hub Atualizado!",
+    Content = "Aimbot Imortal e Auto-Switch Ativados.",
     Duration = 4
 })
