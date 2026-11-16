@@ -201,7 +201,129 @@ T1:CreateToggle({
     CurrentValue = Config.AutoMedKit,
     Flag = "AMK",
     Callback = function(v) Config.AutoMedKit = v end
-})T4:CreateButton({
+})
+
+T1:CreateToggle({
+    Name = "Ignorar Time",
+    CurrentValue = Config.TeamCheck,
+    Flag = "TC",
+    Callback = function(v) Config.TeamCheck = v end
+})
+
+T1:CreateSlider({
+    Name = "Dano Multiplicador",
+    Range = {1, 10},
+    Increment = 0.5,
+    Suffix = "x",
+    CurrentValue = Config.DamageMultiplier,
+    Flag = "DM",
+    Callback = function(v) Config.DamageMultiplier = v end
+})
+
+--// Aba Movimento
+T2:CreateToggle({
+    Name = "Voo Suave",
+    CurrentValue = Config.FlyEnabled,
+    Flag = "FT",
+    Callback = function(v)
+        Config.FlyEnabled = v
+        local c = LP.Character
+        if c and c:FindFirstChildOfClass("Humanoid") then
+            c:FindFirstChildOfClass("Humanoid").PlatformStand = false
+        end
+    end
+})
+
+T2:CreateSlider({
+    Name = "Velocidade Voo",
+    Range = {20, 200},
+    Increment = 10,
+    CurrentValue = Config.FlySpeed,
+    Flag = "FS",
+    Callback = function(v) Config.FlySpeed = v end
+})
+
+T2:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = Config.KillAuraEnabled,
+    Flag = "KA",
+    Callback = function(v) Config.KillAuraEnabled = v end
+})
+
+--// Aba Visual & Loot
+T3:CreateToggle({
+    Name = "ESP Player",
+    CurrentValue = Config.ESPEnabled,
+    Flag = "ESP",
+    Callback = function(v) Config.ESPEnabled = v end
+})
+
+T3:CreateToggle({
+    Name = "Antena Player",
+    CurrentValue = Config.ESPAntenna,
+    Flag = "ANT",
+    Callback = function(v) Config.ESPAntenna = v end
+})
+
+T3:CreateToggle({
+    Name = "ESP Loot Geral (Itens/Armas)",
+    CurrentValue = Config.LootESPEnabled,
+    Flag = "LESP",
+    Callback = function(v) Config.LootESPEnabled = v end
+})
+
+T3:CreateToggle({
+    Name = "Filtro: Mostrar Armas",
+    CurrentValue = Config.LootWeapons,
+    Flag = "LWEP",
+    Callback = function(v) Config.LootWEapons = v end
+})
+
+T3:CreateToggle({
+    Name = "Filtro: Mostrar Munição",
+    CurrentValue = Config.LootAmmo,
+    Flag = "LAMM",
+    Callback = function(v) Config.LootAmmo = v end
+})
+
+T3:CreateToggle({
+    Name = "Filtro: Mostrar Kits Médicos",
+    CurrentValue = Config.LootMedKits,
+    Flag = "LMED",
+    Callback = function(v) Config.LootMedKits = v end
+})
+
+T3:CreateToggle({
+    Name = "Remover Neblina (No Fog)",
+    CurrentValue = Config.NoFogEnabled,
+    Flag = "NFOG",
+    Callback = function(v)
+        Config.NoFogEnabled = v
+        if v then
+            Lighting.FogEnd = 999999
+            pcall(function() Lighting.Atmosphere:Destroy() end)
+        end
+    end
+})
+
+--// Aba Sistema & Owner
+T4:CreateToggle({
+    Name = "Anti-Lag Booster",
+    CurrentValue = Config.AntiLagEnabled,
+    Flag = "ALAG",
+    Callback = function(v)
+        Config.AntiLagEnabled = v
+        if v then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+                    obj.Enabled = false
+                end
+            end
+        end
+    end
+})
+
+T4:CreateButton({
     Name = "Find Owner (gabecriadomal)",
     Callback = function()
         Rayfield:Notify({
@@ -333,7 +455,31 @@ RunService.RenderStepped:Connect(function(dt)
                     elseif hl then
                         hl.Enabled = false
                     end
-                 -- ESP Loot com Filtros Detalhados
+
+                    if Config.ESPAntenna and head and hum and hum.Health > 0 then
+                        if not antenna then
+                            antenna = Instance.new("BillboardGui")
+                            antenna.Name = "RoyAntenna"
+                            antenna.Adornee = head
+                            antenna.Size = UDim2.new(0, 2, 0, 150)
+                            antenna.StudsOffset = Vector3.new(0, 8, 0)
+                            antenna.AlwaysOnTop = true
+                            antenna.Parent = head
+
+                            local line = Instance.new("Frame")
+                            line.Size = UDim2.new(1, 0, 1, 0)
+                            line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                            line.BorderSizePixel = 0
+                            line.Parent = antenna
+                        end
+                        antenna.Enabled = true
+                    elseif antenna then
+                        antenna.Enabled = false
+                    end
+                end
+            end
+
+            -- ESP Loot com Filtros Detalhados
             if Config.LootESPEnabled then
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     local nameLower = obj.Name:lower()
@@ -451,8 +597,9 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 end
             end
-        end   
--- Voo
+        end
+
+        -- Voo
         local rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
@@ -493,3 +640,15 @@ Rayfield:Notify({
     Content = "Carregado com sucesso e configs salvas.",
     Duration = 4
 })
+                            end
+                        end
+                    end
+                end
+            end
+
+            if closestTarget then
+                if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
+                local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
+                Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
+            else
+                if FOVCircle then FOV
