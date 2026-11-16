@@ -1,9 +1,13 @@
 --// ==========================================
---// ROYALITY HUB | V25 (ESTABILIDADE DE LOBBY E MEMÓRIA)
+--// ROYALITY HUB | ULTIMATE V26 (BASE V14 PERFEITA + FIX DE LOBBY)
 --// ==========================================
 
--- 1. Limpeza de memória de execuções anteriores (FOV, Menus e ESPs antigos)
+-- Limpeza profunda de instâncias e loops anteriores para permitir reexecução no lobby
 pcall(function()
+    if getgenv().RoyalityLoop then
+        getgenv().RoyalityLoop:Disconnect()
+        getgenv().RoyalityLoop = nil
+    end
     if getgenv().RoyalityFOV then
         getgenv().RoyalityFOV:Remove()
         getgenv().RoyalityFOV = nil
@@ -32,13 +36,14 @@ end
 
 if not Rayfield then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Erro",
-        Text = "Falha ao carregar interface.",
+        Title = "Erro ao Carregar",
+        Text = "Falha na interface Rayfield. Verifique a internet.",
         Duration = 5
     })
     return
 end
 
+-- Configurações Padrões Salvas para o Botão Reset
 getgenv().DefaultConfig = {
     ESPEnabled = true,
     ESPAntenna = true,
@@ -73,7 +78,7 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
--- Criação segura do Círculo FOV salva em variável global para limpeza futura
+--// Círculo FOV Dinâmico (Salvo globalmente para limpeza)
 local FOVCircle = nil
 pcall(function()
     if Drawing then
@@ -89,22 +94,23 @@ pcall(function()
     end
 end)
 
+--// Janela Principal
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub",
-    LoadingTitle = "Carregando...",
-    LoadingSubtitle = "Delta",
+    Name = "Royality Hub | Ultimate Final",
+    LoadingTitle = "Carregando Hub...",
+    LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
 
-local T1 = Window:CreateTab("Combate", 4483362458)
-local T2 = Window:CreateTab("Movimento", 4483345998)
-local T3 = Window:CreateTab("Visual", 4483345998)
-local T4 = Window:CreateTab("Sistema", 4483345998)
+local T1 = Window:CreateTab("Combate & Aim", 4483362458)
+local T2 = Window:CreateTab("Voo & Movimento", 4483345998)
+local T3 = Window:CreateTab("Visual (ESP & Loot)", 4483345998)
+local T4 = Window:CreateTab("Sistema & Config", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "Aimbot",
+    Name = "🎯 Aimbot Inteligente (Só ativa no Chão)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
@@ -114,14 +120,14 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
-    Name = "WallCheck",
+    Name = "🧱 WallCheck (Não puxa através de paredes)",
     CurrentValue = Config.WallCheck,
     Flag = "WC",
     Callback = function(v) Config.WallCheck = v end
 })
 
 T1:CreateSlider({
-    Name = "Distancia Aimbot",
+    Name = "Distância Máxima do Aimbot",
     Range = {50, 600},
     Increment = 25,
     Suffix = " studs",
@@ -131,7 +137,7 @@ T1:CreateSlider({
 })
 
 T1:CreateSlider({
-    Name = "Força Puxada",
+    Name = "Força de Puxada do Aimbot",
     Range = {1, 20},
     Increment = 1,
     CurrentValue = Config.AimbotStrength,
@@ -140,7 +146,7 @@ T1:CreateSlider({
 })
 
 T1:CreateDropdown({
-    Name = "Parte Alvo",
+    Name = "Parte do Corpo Alvo",
     Options = {"Cabeça", "Peito"},
     CurrentOption = "Cabeça",
     Flag = "AP",
@@ -151,7 +157,7 @@ T1:CreateDropdown({
 })
 
 T1:CreateSlider({
-    Name = "Raio FOV",
+    Name = "Raio de Mira (FOV)",
     Range = {50, 800},
     Increment = 25,
     CurrentValue = Config.FOVRadius,
@@ -163,35 +169,35 @@ T1:CreateSlider({
 })
 
 T1:CreateToggle({
-    Name = "Rapid Fire",
+    Name = "⚡ Ativar Rapid Fire (Recarga/Disparo Rápido)",
     CurrentValue = Config.RapidFireEnabled,
     Flag = "RF",
     Callback = function(v) Config.RapidFireEnabled = v end
 })
 
 T1:CreateToggle({
-    Name = "Auto Trocar Arma",
+    Name = "🔄 Trocar Arma Automático (Ao Descarregar)",
     CurrentValue = Config.AutoSwitchEnabled,
     Flag = "AS",
     Callback = function(v) Config.AutoSwitchEnabled = v end
 })
 
 T1:CreateToggle({
-    Name = "Auto Kit Médico",
+    Name = "💊 Auto Kit Médico (Usa quando perde vida)",
     CurrentValue = Config.AutoMedKit,
     Flag = "AMK",
     Callback = function(v) Config.AutoMedKit = v end
 })
 
 T1:CreateToggle({
-    Name = "Ignorar Time",
+    Name = "Ignorar Time (TeamCheck)",
     CurrentValue = Config.TeamCheck,
     Flag = "TC",
     Callback = function(v) Config.TeamCheck = v end
 })
 
 T1:CreateSlider({
-    Name = "Dano Multiplicador",
+    Name = "Multiplicador de Dano",
     Range = {1, 10},
     Increment = 0.5,
     Suffix = "x",
@@ -200,9 +206,9 @@ T1:CreateSlider({
     Callback = function(v) Config.DamageMultiplier = v end
 })
 
---// Aba Movimento
+--// Aba Voo & Movimento
 T2:CreateToggle({
-    Name = "Voo",
+    Name = "✈️ Ativar Voo Suave",
     CurrentValue = Config.FlyEnabled,
     Flag = "FT",
     Callback = function(v)
@@ -215,7 +221,7 @@ T2:CreateToggle({
 })
 
 T2:CreateSlider({
-    Name = "Velocidade Voo",
+    Name = "Velocidade do Voo",
     Range = {20, 200},
     Increment = 10,
     CurrentValue = Config.FlySpeed,
@@ -224,36 +230,36 @@ T2:CreateSlider({
 })
 
 T2:CreateToggle({
-    Name = "Kill Aura",
+    Name = "⚔️ Kill Aura Próximo (Seguro)",
     CurrentValue = Config.KillAuraEnabled,
     Flag = "KA",
     Callback = function(v) Config.KillAuraEnabled = v end
 })
 
---// Aba Visual
+--// Aba Visual (ESP & Loot)
 T3:CreateToggle({
-    Name = "ESP Player",
+    Name = "👁️ Ativar ESP Destaque (Longo Alcance)",
     CurrentValue = Config.ESPEnabled,
     Flag = "ESP",
     Callback = function(v) Config.ESPEnabled = v end
 })
 
 T3:CreateToggle({
-    Name = "Antena Player",
+    Name = "📡 Ativar Antena Vermelha no Topo da Cabeça",
     CurrentValue = Config.ESPAntenna,
     Flag = "ANT",
     Callback = function(v) Config.ESPAntenna = v end
 })
 
 T3:CreateToggle({
-    Name = "ESP Loot / Armas",
+    Name = "🟡 Ativar ESP de Armas / Loot no Mapa",
     CurrentValue = Config.LootESPEnabled,
     Flag = "LESP",
     Callback = function(v) Config.LootESPEnabled = v end
 })
 
 T3:CreateToggle({
-    Name = "Remover Neblina",
+    Name = "🌫️ Remover Neblina (No Fog)",
     CurrentValue = Config.NoFogEnabled,
     Flag = "NFOG",
     Callback = function(v)
@@ -268,9 +274,9 @@ T3:CreateToggle({
     end
 })
 
---// Aba Sistema
+--// Aba Sistema & Config
 T4:CreateToggle({
-    Name = "Anti-Lag",
+    Name = "🚀 Anti-Lag Booster",
     CurrentValue = Config.AntiLagEnabled,
     Flag = "ALAG",
     Callback = function(v)
@@ -286,20 +292,22 @@ T4:CreateToggle({
 })
 
 T4:CreateButton({
-    Name = "Resetar Configurações",
+    Name = "🔄 Resetar Configurações para o Padrão",
     Callback = function()
         for k, v in pairs(DefaultConfig) do
             Config[k] = v
         end
         Rayfield:Notify({
-            Title = "Reset",
-            Content = "Configurações restauradas.",
+            Title = "Resetado!",
+            Content = "Todas as configurações voltaram ao padrão.",
             Duration = 3
         })
     end
 })
 
---// Função WallCheck
+--// ==========================================
+--// FUNÇÃO DE VISIBILIDADE (WALLCHECK)
+--// ==========================================
 local function isVisible(targetPart, targetCharacter)
     if not Config.WallCheck then return true end
     local origin = Cam.CFrame.Position
@@ -316,33 +324,29 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Gerenciador de Conexão Única (Evita loops duplicados ao reexecutar)
-if getgenv().RoyalityLoop then
-    getgenv().RoyalityLoop:Disconnect()
-    getgenv().RoyalityLoop = nil
-end
-
+--// ==========================================
+--// LOOP PRINCIPAL DE COMBATE, ESP, ANTENA & LOOT (ESTÁVEL)
+--// ==========================================
 local counter = 0
 getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
-    Cam = workspace.CurrentCamera
-    if not Cam then return end
+    pcall(function()
+        Cam = workspace.CurrentCamera
+        if not Cam then return end
 
-    if FOVCircle then
-        pcall(function()
+        if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-        end)
-    end
+        end
 
-    local character = LP.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    local hum = character:FindFirstChildOfClass("Humanoid")
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local backpack = LP:FindFirstChildOfClass("Backpack")
 
-    counter = counter + 1
-    local runHeavyTasks = (counter % 10 == 0)
+        counter = counter + 1
+        local runHeavyTasks = (counter % 5 == 0)
 
-    -- 1. ESP & Loot (Isolado em pcall próprio)
-    if runHeavyTasks then
-        pcall(function()
+        -- 1. Tarefas pesadas otimizadas (ESP e Loot a cada 5 frames para economizar desempenho)
+        if runHeavyTasks then
+            -- ESP de Jogadores (Longo Alcance + Cores + Antena Vermelha)
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
                     local pChar = p.Character
@@ -363,11 +367,17 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                             hl.Parent = pChar
                         end
                         hl.Enabled = true
-                        hl.FillColor = (pHum and pHum.Health > 0) and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 100, 255)
+                        
+                        if pHum and pHum.Health > 0 then
+                            hl.FillColor = Color3.fromRGB(255, 0, 0) -- Vermelho se vivo
+                        else
+                            hl.FillColor = Color3.fromRGB(0, 100, 255) -- Azul se morto/abatido
+                        end
                     elseif hl then
                         hl.Enabled = false
                     end
 
+                    -- Antena Vermelha no Topo da Cabeça
                     if Config.ESPAntenna and head and pHum and pHum.Health > 0 then
                         if not antenna then
                             antenna = Instance.new("BillboardGui")
@@ -391,7 +401,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                 end
             end
 
-            -- ESP Loot usando BillboardGui leve (não estoura o limite de 31 Highlights do Roblox)
+            -- ESP de Armas / Loot Amarelo no Mapa
             if Config.LootESPEnabled then
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     if obj:IsA("Tool") or obj.Name:lower():find("gun") or obj.Name:lower():find("weapon") or obj.Name:lower():find("ammo") or obj.Name:lower():find("medkit") then
@@ -408,40 +418,36 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                             local txt = Instance.new("TextLabel")
                             txt.Size = UDim2.new(1, 0, 1, 0)
                             txt.BackgroundTransparency = 1
-                            txt.Text = "[LOOT] " .. obj.Name
+                            txt.Text = obj.Name
                             txt.TextColor3 = Color3.fromRGB(255, 255, 0)
                             txt.TextStrokeTransparency = 0
-                            txt.TextSize = 12
+                            txt.TextSize = 13
                             txt.Font = Enum.Font.GothamBold
                             txt.Parent = bill
                         end
                     end
                 end
             end
-        end)
-    end
+        end
 
-    -- 2. Auto Kit Médico (Isolado)
-    pcall(function()
-        local backpack = LP:FindFirstChildOfClass("Backpack")
+        -- 2. Auto Kit Médico (Usa automaticamente se perder vida)
         if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth and backpack then
             for _, tool in ipairs(backpack:GetChildren()) do
                 if tool:IsA("Tool") and (tool.Name:lower():find("med") or tool.Name:lower():find("kit") or tool.Name:lower():find("heal") or tool.Name:lower():find("bandage")) then
                     hum:EquipTool(tool)
-                    tool:Activate()
+                    task.wait(0.1)
+                    pcall(function() tool:Activate() end)
                     break
                 end
             end
         end
-    end)
 
-    -- 3. Aimbot no Chão (Isolado)
-    pcall(function()
+        -- 3. Aimbot Inteligente com WallCheck (SÓ ATIVA NO CHÃO - Ignora Avião e Queda)
         if Config.AimbotEnabled and hum and hum.FloorMaterial ~= Enum.Material.Air then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = character:FindFirstChild("HumanoidRootPart")
+            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
 
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character and myRoot then
@@ -477,13 +483,10 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
         else
             if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
         end
-    end)
 
-    -- 4. Auto-Switch, Voo e Kill Aura (Isolados)
-    pcall(function()
-        local backpack = LP:FindFirstChildOfClass("Backpack")
-        if Config.AutoSwitchEnabled and backpack and hum then
-            local currentTool = character:FindFirstChildOfClass("Tool")
+        -- 4. Auto-Switch Weapon
+        if Config.AutoSwitchEnabled and char and backpack then
+            local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
                 local ammoVal = currentTool:FindFirstChild("Ammo") or currentTool:FindFirstChild("Clip") or currentTool:FindFirstChild("Bullets")
                 if ammoVal and ammoVal.Value <= 0 then
@@ -497,7 +500,8 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        local rp = character:FindFirstChild("HumanoidRootPart")
+        -- 5. Voo Suave
+        local rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
             rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -512,6 +516,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
+        -- 6. Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -520,8 +525,8 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                     if pHum and pHum.Health > 0 and pRp then
                         if not Config.TeamCheck or p.Team ~= LP.Team then
                             if (rp.Position - pRp.Position).Magnitude <= 20 then
-                                local tool = character:FindFirstChildOfClass("Tool")
-                                if tool then tool:Activate() end
+                                local tool = char:FindFirstChildOfClass("Tool")
+                                if tool then pcall(function() tool:Activate() end) end
                             end
                         end
                     end
@@ -532,7 +537,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub",
-    Content = "Pronto e limpo para múltiplas partidas.",
+    Title = "Royality Hub V26 Carregado!",
+    Content = "Estabilidade Total, Lobby Fix e Aimbot no Chão Ativos.",
     Duration = 4
 })
