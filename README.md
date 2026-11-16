@@ -1,8 +1,7 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V28 (FIX: INTERFACE NÃO APARECIA + COMPLETO)
+--// ROYALITY HUB | ULTIMATE V29 (DEFINITIVE FIX: UI VISÍVEL + COMPLETO)
 --// ==========================================
 
--- Limpeza preventiva de instâncias e conexões antigas para forçar a interface a aparecer
 pcall(function()
     if getgenv().RoyalityLoop then
         getgenv().RoyalityLoop:Disconnect()
@@ -17,38 +16,23 @@ pcall(function()
             v:Destroy()
         end
     end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "RoyESP" or obj.Name == "RoyAntenna" or obj.Name == "RoyLootESP" or obj.Name == "RoyLootText" then
-            obj:Destroy()
-        end
-    end
-end)
-
-pcall(function()
-    if syn and syn.queue_on_teleport then
-        syn.queue_on_teleport(game:HttpGet(script_url or ""))
-    elseif queue_on_teleport then
-        queue_on_teleport([[
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
-        ]])
-    end
 end)
 
 local Success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 end)
 
 if not Success or not Rayfield then
     Success, Rayfield = pcall(function()
-        return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+        return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
     end)
 end
 
 if not Rayfield then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Erro",
-        Text = "Falha ao carregar Rayfield.",
-        Duration = 5
+        Title = "Erro Crítico",
+        Text = "Falha ao carregar a interface Rayfield.",
+        Duration = 6
     })
     return
 end
@@ -433,7 +417,7 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Otimizado e Vinculado Globalmente
+--// Loop Principal Otimizado
 local counter = 0
 getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
     pcall(function()
@@ -593,8 +577,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                     end
                 end
             end
-
-            if closestTarget then
+if closestTarget then
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
                 local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
                 Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
@@ -658,7 +641,8 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Ultimate",
-    Content = "Interface limpa, carregada e visível na tela.",
+    Title = "Royality Hub Ultimate V29",
+    Content = "Interface carregada e visível com sucesso!",
     Duration = 4
 })
+            
