@@ -1,8 +1,7 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V19 (TELEPORT FIX & PERSISTENTE)
+--// ROYALITY HUB | ULTIMATE V20 (OTIMIZADO + ANTI-LAG + NO FOG + AIMBOT CHÃO)
 --// ==========================================
 
--- Sistema Anti-Crash de Teletransporte (Garante que o script viaja junto para o novo servidor)
 pcall(function()
     if syn and syn.queue_on_teleport then
         syn.queue_on_teleport(game:HttpGet(script_url or ""))
@@ -49,7 +48,9 @@ getgenv().DefaultConfig = {
     DamageMultiplier = 3.0,
     FlyEnabled = false,
     FlySpeed = 60,
-    KillAuraEnabled = false
+    KillAuraEnabled = false,
+    AntiLagEnabled = false,
+    NoFogEnabled = false
 }
 
 getgenv().Config = {
@@ -69,7 +70,9 @@ getgenv().Config = {
     DamageMultiplier = 3.0,
     FlyEnabled = false,
     FlySpeed = 60,
-    KillAuraEnabled = false
+    KillAuraEnabled = false,
+    AntiLagEnabled = false,
+    NoFogEnabled = false
 }
 
 local Players = game:GetService("Players")
@@ -77,6 +80,7 @@ local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
@@ -256,7 +260,36 @@ T3:CreateToggle({
     Callback = function(v) Config.LootESPEnabled = v end
 })
 
+T3:CreateToggle({
+    Name = "Remover Neblina (No Fog)",
+    CurrentValue = Config.NoFogEnabled,
+    Flag = "NFOG",
+    Callback = function(v)
+        Config.NoFogEnabled = v
+        if v then
+            Lighting.FogEnd = 999999
+            pcall(function() Lighting.Atmosphere:Destroy() end)
+        end
+    end
+})
+
 --// Aba Sistema
+T4:CreateToggle({
+    Name = "Anti-Lag Booster",
+    CurrentValue = Config.AntiLagEnabled,
+    Flag = "ALAG",
+    Callback = function(v)
+        Config.AntiLagEnabled = v
+        if v then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+                    obj.Enabled = false
+                end
+            end
+        end
+    end
+})
+
 T4:CreateButton({
     Name = "Find Owner",
     Callback = function()
@@ -324,7 +357,8 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Persistente (Blindado contra teletransporte e troca de servidor)
+--// Loop Principal Otimizado e Leve
+local counter = 0
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         if not LP or not LP.Character then return end
@@ -333,94 +367,102 @@ RunService.RenderStepped:Connect(function(dt)
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
 
-        -- ESP Player & Antena
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP and p.Character then
-                local char = p.Character
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                local head = char:FindFirstChild("Head")
-                local hl = char:FindFirstChild("RoyESP")
-                local antenna = char:FindFirstChild("RoyAntenna")
-                
-                if Config.ESPEnabled and char then
-                    if not hl then
-                        hl = Instance.new("Highlight")
-                        hl.Name = "RoyESP"
-                        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        hl.FillTransparency = 0.5
-                        hl.OutlineTransparency = 0
-                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                        hl.Adornee = char
-                        hl.Parent = char
-                    end
-                    hl.Enabled = true
+        -- Otimização: Roda varreduras pesadas a cada 5 frames para economizar processamento
+        counter = counter + 1
+        local runHeavyTasks = (counter % 5 == 0)
+
+        if runHeavyTasks then
+            -- ESP Player & Antena
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character then
+                    local char = p.Character
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local head = char:FindFirstChild("Head")
+                    local hl = char:FindFirstChild("RoyESP")
+                    local antenna = char:FindFirstChild("RoyAntenna")
                     
-                    if hum and hum.Health > 0 then
-                        hl.FillColor = Color3.fromRGB(255, 0, 0)
-                    else
-                        hl.FillColor = Color3.fromRGB(0, 100, 255)
+                    if Config.ESPEnabled and char then
+                        if not hl then
+                            hl = Instance.new("Highlight")
+                            hl.Name = "RoyESP"
+                            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                            hl.FillTransparency = 0.5
+                            hl.OutlineTransparency = 0
+                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                            hl.Adornee = char
+                            hl.Parent = char
+                        end
+                        hl.Enabled = true
+                        
+                        if hum and hum.Health > 0 then
+                            hl.FillColor = Color3.fromRGB(255, 0, 0)
+                        else
+                            hl.FillColor = Color3.fromRGB(0, 100, 255)
+                        end
+                    elseif hl then
+                        hl.Enabled = false
                     end
-                elseif hl then
-                    hl.Enabled = false
-                end
 
-                if Config.ESPAntenna and head and hum and hum.Health > 0 then
-                    if not antenna then
-                        antenna = Instance.new("BillboardGui")
-                        antenna.Name = "RoyAntenna"
-                        antenna.Adornee = head
-                        antenna.Size = UDim2.new(0, 2, 0, 150)
-                        antenna.StudsOffset = Vector3.new(0, 8, 0)
-                        antenna.AlwaysOnTop = true
-                        antenna.Parent = head
+                    if Config.ESPAntenna and head and hum and hum.Health > 0 then
+                        if not antenna then
+                            antenna = Instance.new("BillboardGui")
+                            antenna.Name = "RoyAntenna"
+                            antenna.Adornee = head
+                            antenna.Size = UDim2.new(0, 2, 0, 150)
+                            antenna.StudsOffset = Vector3.new(0, 8, 0)
+                            antenna.AlwaysOnTop = true
+                            antenna.Parent = head
 
-                        local line = Instance.new("Frame")
-                        line.Size = UDim2.new(1, 0, 1, 0)
-                        line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-                        line.BorderSizePixel = 0
-                        line.Parent = antenna
+                            local line = Instance.new("Frame")
+                            line.Size = UDim2.new(1, 0, 1, 0)
+                            line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                            line.BorderSizePixel = 0
+                            line.Parent = antenna
+                        end
+                        antenna.Enabled = true
+                    elseif antenna then
+                        antenna.Enabled = false
                     end
-                    antenna.Enabled = true
-                elseif antenna then
-                    antenna.Enabled = false
                 end
             end
-        end
 
-        -- ESP Loot
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if Config.LootESPEnabled and (obj:IsA("Tool") or obj.Name:lower():find("gun") or obj.Name:lower():find("weapon") or obj.Name:lower():find("ammo") or obj.Name:lower():find("medkit")) then
-                local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or (obj:IsA("BasePart") and obj)
-                if part then
-                    local lootHl = obj:FindFirstChild("RoyLootESP")
-                    if not lootHl then
-                        lootHl = Instance.new("Highlight")
-                        lootHl.Name = "RoyLootESP"
-                        lootHl.FillColor = Color3.fromRGB(255, 255, 0)
-                        lootHl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        lootHl.FillTransparency = 0.4
-                        lootHl.Adornee = obj
-                        lootHl.Parent = obj
+            -- ESP Loot
+            if Config.LootESPEnabled then
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("Tool") or obj.Name:lower():find("gun") or obj.Name:lower():find("weapon") or obj.Name:lower():find("ammo") or obj.Name:lower():find("medkit") then
+                        local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or (obj:IsA("BasePart") and obj)
+                        if part then
+                            local lootHl = obj:FindFirstChild("RoyLootESP")
+                            if not lootHl then
+                                lootHl = Instance.new("Highlight")
+                                lootHl.Name = "RoyLootESP"
+                                lootHl.FillColor = Color3.fromRGB(255, 255, 0)
+                                lootHl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                                lootHl.FillTransparency = 0.4
+                                lootHl.Adornee = obj
+                                lootHl.Parent = obj
 
-                        local bill = Instance.new("BillboardGui")
-                        bill.Name = "RoyLootText"
-                        bill.Adornee = part
-                        bill.Size = UDim2.new(0, 100, 0, 30)
-                        bill.StudsOffset = Vector3.new(0, 2, 0)
-                        bill.AlwaysOnTop = true
-                        bill.Parent = part
+                                local bill = Instance.new("BillboardGui")
+                                bill.Name = "RoyLootText"
+                                bill.Adornee = part
+                                bill.Size = UDim2.new(0, 100, 0, 30)
+                                bill.StudsOffset = Vector3.new(0, 2, 0)
+                                bill.AlwaysOnTop = true
+                                bill.Parent = part
 
-                        local txt = Instance.new("TextLabel")
-                        txt.Size = UDim2.new(1, 0, 1, 0)
-                        txt.BackgroundTransparency = 1
-                        txt.Text = obj.Name
-                        txt.TextColor3 = Color3.fromRGB(255, 255, 0)
-                        txt.TextStrokeTransparency = 0
-                        txt.TextSize = 13
-                        txt.Font = Enum.Font.GothamBold
-                        txt.Parent = bill
+                                local txt = Instance.new("TextLabel")
+                                txt.Size = UDim2.new(1, 0, 1, 0)
+                                txt.BackgroundTransparency = 1
+                                txt.Text = obj.Name
+                                txt.TextColor3 = Color3.fromRGB(255, 255, 0)
+                                txt.TextStrokeTransparency = 0
+                                txt.TextSize = 13
+                                txt.Font = Enum.Font.GothamBold
+                                txt.Parent = bill
+                            end
+                            lootHl.Enabled = true
+                        end
                     end
-                    lootHl.Enabled = true
                 end
             end
         end
@@ -442,12 +484,12 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Aimbot
-        if Config.AimbotEnabled then
+        -- Aimbot Original Ajustado (Só ativa quando o boneco pousa no chão e sai do avião)
+        if Config.AimbotEnabled and hum and hum.FloorMaterial ~= Enum.Material.Air then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            local myRoot = char:FindFirstChild("HumanoidRootPart")
 
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character and myRoot then
@@ -480,6 +522,8 @@ RunService.RenderStepped:Connect(function(dt)
             else
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
             end
+        else
+            if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
         end
 
         -- Auto-Switch
@@ -513,7 +557,6 @@ RunService.RenderStepped:Connect(function(dt)
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then flyVec = flyVec + Vector3.new(0, -1, 0) end
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
-
         -- Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
@@ -536,6 +579,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Pronto e persistente entre servers.",
+    Content = "Versão Otimizada e Anti-Lag Ativada.",
     Duration = 4
 })
