@@ -328,14 +328,6 @@ local function getAllEnemyCharacters()
     return list
 end
 
-local function getTargetAimPart(char)
-    if Config.AimPart == "Head" then
-        return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-    else
-        return char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-    end
-end
-
 local trackedLoot = {}
 local ignoredSpawners = {
     lootspot = true, loot = true, spawn = true, spawner = true,
@@ -867,29 +859,26 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
+        -- Aimbot Inteligente com WallCheck e Distancia Maxima (Exato da versao_certa)
         if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 
-            for _, entry in ipairs(enemies) do
-                local eChar = entry.char
-                local ePlayer = entry.player
-                if eChar and eChar.Parent and myRoot then
-                    local eHum = eChar:FindFirstChildOfClass("Humanoid")
-                    local part = getTargetAimPart(eChar)
-                    local rp = eChar:FindFirstChild("HumanoidRootPart") or part
-
-                    if eHum and eHum.Health > 0 and part and rp then
-                        if Config.TeamCheck and ePlayer and LP.Team and ePlayer.Team == LP.Team then
-                            continue
-                        end
-
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and myRoot then
+                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+                    local part = p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
+                    local rp = p.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if pHum and pHum.Health > 0 and part and rp then
+                        if Config.TeamCheck and p.Team == LP.Team then continue end
+                        
                         local worldDist = (rp.Position - myRoot.Position).Magnitude
                         if worldDist <= Config.MaxAimDistance then
                             local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
-                            if onScreen and isVisible(part, eChar) then
+                            if onScreen and isVisible(part, p.Character) then
                                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
                                 if dist < shortestDist then
                                     shortestDist = dist
@@ -941,15 +930,13 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
         end
 
         if Config.KillAuraEnabled and rp and hum then
-            for _, entry in ipairs(enemies) do
-                local eChar = entry.char
-                local ePlayer = entry.player
-                if eChar and eChar.Parent then
-                    local eHum = eChar:FindFirstChildOfClass("Humanoid")
-                    local eRp = eChar:FindFirstChild("HumanoidRootPart") or eChar:FindFirstChild("Head")
-                    if eHum and eHum.Health > 0 and eRp then
-                        if not Config.TeamCheck or not ePlayer or not LP.Team or ePlayer.Team ~= LP.Team then
-                            if (rp.Position - eRp.Position).Magnitude <= 20 then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character then
+                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
+                    local pRp = p.Character:FindFirstChild("HumanoidRootPart")
+                    if pHum and pHum.Health > 0 and pRp then
+                        if not Config.TeamCheck or p.Team ~= LP.Team then
+                            if (rp.Position - pRp.Position).Magnitude <= 20 then
                                 local tool = char:FindFirstChildOfClass("Tool")
                                 if tool then pcall(function() tool:Activate() end) end
                             end
