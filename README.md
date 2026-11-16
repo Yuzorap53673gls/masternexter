@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V20 (OTIMIZADO + ANTI-LAG + NO FOG + AIMBOT CHÃO)
+--// ROYALITY HUB | ULTIMATE V21 (FIX DEFINITIVO: PERSISTÊNCIA APÓS MORTE)
 --// ==========================================
 
 pcall(function()
@@ -357,17 +357,17 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Otimizado e Leve
+--// Loop Principal Persistente com Reconexão Automática de Personagem
 local counter = 0
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
-        if not LP or not LP.Character then return end
+        local character = LP.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
         
         if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
 
-        -- Otimização: Roda varreduras pesadas a cada 5 frames para economizar processamento
         counter = counter + 1
         local runHeavyTasks = (counter % 5 == 0)
 
@@ -375,13 +375,13 @@ RunService.RenderStepped:Connect(function(dt)
             -- ESP Player & Antena
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
-                    local char = p.Character
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    local head = char:FindFirstChild("Head")
-                    local hl = char:FindFirstChild("RoyESP")
-                    local antenna = char:FindFirstChild("RoyAntenna")
+                    local pChar = p.Character
+                    local hum = pChar:FindFirstChildOfClass("Humanoid")
+                    local head = pChar:FindFirstChild("Head")
+                    local hl = pChar:FindFirstChild("RoyESP")
+                    local antenna = pChar:FindFirstChild("RoyAntenna")
                     
-                    if Config.ESPEnabled and char then
+                    if Config.ESPEnabled and pChar then
                         if not hl then
                             hl = Instance.new("Highlight")
                             hl.Name = "RoyESP"
@@ -389,8 +389,8 @@ RunService.RenderStepped:Connect(function(dt)
                             hl.FillTransparency = 0.5
                             hl.OutlineTransparency = 0
                             hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                            hl.Adornee = char
-                            hl.Parent = char
+                            hl.Adornee = pChar
+                            hl.Parent = pChar
                         end
                         hl.Enabled = true
                         
@@ -468,14 +468,13 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         -- Auto Kit Médico
-        local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hum = character:FindFirstChildOfClass("Humanoid")
         if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
             if backpack then
                 for _, tool in ipairs(backpack:GetChildren()) do
                     if tool:IsA("Tool") and (tool.Name:lower():find("med") or tool.Name:lower():find("kit") or tool.Name:lower():find("heal") or tool.Name:lower():find("bandage")) then
-                        char.Humanoid:EquipTool(tool)
+                        hum:EquipTool(tool)
                         task.wait(0.1)
                         pcall(function() tool:Activate() end)
                         break
@@ -484,12 +483,12 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Aimbot Original Ajustado (Só ativa quando o boneco pousa no chão e sai do avião)
+        -- Aimbot (Ativa apenas no chão, ignorando avião/ar)
         if Config.AimbotEnabled and hum and hum.FloorMaterial ~= Enum.Material.Air then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = char:FindFirstChild("HumanoidRootPart")
+            local myRoot = character:FindFirstChild("HumanoidRootPart")
 
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character and myRoot then
@@ -527,14 +526,14 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         -- Auto-Switch
-        if Config.AutoSwitchEnabled and char and backpack then
-            local currentTool = char:FindFirstChildOfClass("Tool")
+        if Config.AutoSwitchEnabled and character and backpack then
+            local currentTool = character:FindFirstChildOfClass("Tool")
             if currentTool then
                 local ammoVal = currentTool:FindFirstChild("Ammo") or currentTool:FindFirstChild("Clip") or currentTool:FindFirstChild("Bullets")
                 if ammoVal and ammoVal.Value <= 0 then
                     for _, tool in ipairs(backpack:GetChildren()) do
                         if tool:IsA("Tool") then
-                            char.Humanoid:EquipTool(tool)
+                            hum:EquipTool(tool)
                             break
                         end
                     end
@@ -543,7 +542,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         -- Voo
-        local rp = char and char:FindFirstChild("HumanoidRootPart")
+        local rp = character:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
             rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -557,6 +556,7 @@ RunService.RenderStepped:Connect(function(dt)
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then flyVec = flyVec + Vector3.new(0, -1, 0) end
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
+
         -- Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
@@ -566,7 +566,7 @@ RunService.RenderStepped:Connect(function(dt)
                     if pHum and pHum.Health > 0 and pRp then
                         if not Config.TeamCheck or p.Team ~= LP.Team then
                             if (rp.Position - pRp.Position).Magnitude <= 20 then
-                                local tool = char:FindFirstChildOfClass("Tool")
+                                local tool = character:FindFirstChildOfClass("Tool")
                                 if tool then pcall(function() tool:Activate() end) end
                             end
                         end
@@ -579,6 +579,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Versão Otimizada e Anti-Lag Ativada.",
+    Content = "Carregado com persistência total.",
     Duration = 4
 })
