@@ -1,6 +1,15 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V22 (CORREÇÃO DE TELA + REMOÇÃO DO FIND OWNER)
+--// ROYALITY HUB | ULTIMATE V23 (FIX: REEXECUÇÃO NO LOBBY)
 --// ==========================================
+
+-- Limpa interfaces antigas presas na memória para permitir reexecução no lobby
+pcall(function()
+    for _, v in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        if v.Name:lower():find("rayfield") or v.Name:lower():find("royality") then
+            v:Destroy()
+        end
+    end
+end)
 
 local Success, Rayfield = pcall(function()
     return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -531,6 +540,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Interface carregada com sucesso.",
+    Content = "Carregado e pronto para o lobby.",
     Duration = 4
 })
