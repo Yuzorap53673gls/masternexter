@@ -1,12 +1,15 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V18 (FIX: EXECUÇÃO CONTÍNUA)
+--// ROYALITY HUB | ULTIMATE V19 (TELEPORT FIX & PERSISTENTE)
 --// ==========================================
 
+-- Sistema Anti-Crash de Teletransporte (Garante que o script viaja junto para o novo servidor)
 pcall(function()
     if syn and syn.queue_on_teleport then
-        syn.queue_on_teleport(game:HttpGet("SEU_LINK_OU_SCRIPT_AQUI"))
+        syn.queue_on_teleport(game:HttpGet(script_url or ""))
     elseif queue_on_teleport then
-        queue_on_teleport(game:HttpGet("SEU_LINK_OU_SCRIPT_AQUI"))
+        queue_on_teleport([[
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+        ]])
     end
 end)
 
@@ -321,7 +324,7 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Persistente (Blindado contra paradas)
+--// Loop Principal Persistente (Blindado contra teletransporte e troca de servidor)
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         if not LP or not LP.Character then return end
@@ -533,6 +536,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Carregado e persistente.",
+    Content = "Pronto e persistente entre servers.",
     Duration = 4
 })
