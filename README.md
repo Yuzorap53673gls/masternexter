@@ -569,7 +569,8 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                     end
                 end
             end
-        endlocal rp = char and char:FindFirstChild("HumanoidRootPart")
+        end
+        local rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
             rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
