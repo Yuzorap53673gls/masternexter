@@ -1,6 +1,6 @@
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Royality Hub",
-    Text = "Iniciando menu...",
+    Text = "Iniciando...",
     Duration = 3
 })
 
@@ -23,7 +23,7 @@ pcall(function()
         end
     end
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "RoyLootText" or obj.Name == "RoyLootESP" then
+        if obj.Name == "RoyESP" or obj.Name == "RoyAntenna" or obj.Name == "RoyLootText" or obj.Name == "RoyLootESP" then
             obj:Destroy()
         end
     end
@@ -48,9 +48,9 @@ end
 
 if not Rayfield then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Erro de Rede",
-        Text = "Falha ao baixar o Rayfield.",
-        Duration = 6
+        Title = "Erro",
+        Text = "Falha ao baixar Rayfield.",
+        Duration = 5
     })
     return
 end
@@ -64,13 +64,12 @@ getgenv().DefaultConfig = {
     LootMedKits = true,
     AutoMedKit = false,
     AimbotEnabled = true,
-    AimOnlyFiring = true,
     TeamCheck = false,
     WallCheck = true,
     MaxAimDistance = 250,
     AimPart = "Head",
-    FOVRadius = 220,
-    AimbotStrength = 8,
+    FOVRadius = 400,
+    AimbotStrength = 15,
     RapidFireEnabled = false,
     AutoSwitchEnabled = false,
     DamageMultiplier = 3.0,
@@ -98,21 +97,6 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
-local isFiring = false
-UIS.InputBegan:Connect(function(input, gpe)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if not gpe then
-            isFiring = true
-        end
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isFiring = false
-    end
-end)
-
 local FOVCircle = nil
 pcall(function()
     if Drawing then
@@ -138,24 +122,17 @@ local Window = Rayfield:CreateWindow({
 
 local T1 = Window:CreateTab("Combate", 4483362458)
 local T2 = Window:CreateTab("Movimento", 4483345998)
-local T3 = Window:CreateTab("Visual & Loot", 4483345998)
-local T4 = Window:CreateTab("Sistema & Owner", 4483345998)
+local T3 = Window:CreateTab("Visual e Loot", 4483345998)
+local T4 = Window:CreateTab("Sistema e Owner", 4483345998)
 
 T1:CreateToggle({
-    Name = "Aimbot (Chao)",
+    Name = "Aimbot Inteligente",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
         Config.AimbotEnabled = v
         if FOVCircle then FOVCircle.Visible = v end
     end
-})
-
-T1:CreateToggle({
-    Name = "Ativar Apenas Atirando",
-    CurrentValue = Config.AimOnlyFiring,
-    Flag = "AOF",
-    Callback = function(v) Config.AimOnlyFiring = v end
 })
 
 T1:CreateToggle({
@@ -274,8 +251,12 @@ T2:CreateToggle({
     Callback = function(v) Config.KillAuraEnabled = v end
 })
 
---// Cache Otimizado para Itens Reais do Mapa
 local trackedLoot = {}
+local genericNames = {
+    handle = true, part = true, meshpart = true, union = true,
+    model = true, drop = true, item = true, loot = true,
+    pickup = true, hitbox = true, root = true, primarypart = true
+}
 
 local function isPlayerCharacter(inst)
     for _, p in ipairs(Players:GetPlayers()) do
@@ -286,9 +267,41 @@ local function isPlayerCharacter(inst)
     return false
 end
 
+local function resolveRealItemName(obj)
+    local attrName = obj:GetAttribute("ItemName") or obj:GetAttribute("DisplayName") or obj:GetAttribute("Name")
+    if type(attrName) == "string" and attrName ~= "" then
+        return attrName
+    end
+
+    for _, child in ipairs(obj:GetChildren()) do
+        if child:IsA("StringValue") and (child.Name:lower():find("name") or child.Name:lower():find("item")) and child.Value ~= "" then
+            return child.Value
+        end
+    end
+
+    local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        if prompt.ObjectText and prompt.ObjectText ~= "" then
+            return prompt.ObjectText
+        elseif prompt.ActionText and prompt.ActionText ~= "" and not genericNames[prompt.ActionText:lower()] then
+            return prompt.ActionText
+        end
+    end
+
+    local cleanName = obj.Name
+    if genericNames[cleanName:lower()] and obj.Parent and obj.Parent ~= workspace then
+        local parentName = obj.Parent.Name
+        if not genericNames[parentName:lower()] then
+            cleanName = parentName
+        end
+    end
+
+    return cleanName
+end
+
 local function classifyRealLoot(obj)
-    if not obj or not obj.Parent or isPlayerCharacter(obj) then return nil, nil end
-    if obj:IsA("Terrain") or obj:IsA("Camera") or obj:IsA("Folder") then return nil, nil end
+    if not obj or not obj.Parent or isPlayerCharacter(obj) then return nil, nil, nil end
+    if obj:IsA("Terrain") or obj:IsA("Camera") or obj:IsA("Folder") then return nil, nil, nil end
 
     local isRealItem = false
     local targetPart = nil
@@ -301,6 +314,9 @@ local function classifyRealLoot(obj)
         local parentFolder = obj.Parent and obj.Parent.Name:lower() or ""
         local inLootContainer = parentFolder:find("loot") or parentFolder:find("drop") or parentFolder:find("item") or parentFolder:find("pickup") or parentFolder:find("weapon") or parentFolder:find("gun")
         if hasPrompt or inLootContainer then
+            if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") and trackedLoot[obj.Parent] then
+                return nil, nil, nil
+            end
             targetPart = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
             if targetPart and targetPart.Size.Magnitude < 25 then
                 isRealItem = true
@@ -308,15 +324,17 @@ local function classifyRealLoot(obj)
         end
     end
 
-    if not isRealItem or not targetPart then return nil, nil end
+    if not isRealItem or not targetPart then return nil, nil, nil end
 
-    local nameLower = obj.Name:lower()
+    local realName = resolveRealItemName(obj)
+    local nameLower = realName:lower()
+
     if nameLower:find("med") or nameLower:find("kit") or nameLower:find("heal") or nameLower:find("band") or nameLower:find("cura") or nameLower:find("vida") or nameLower:find("syringe") or nameLower:find("potion") then
-        return "Med", targetPart
+        return "Med", targetPart, realName
     elseif nameLower:find("ammo") or nameLower:find("bullet") or nameLower:find("mag") or nameLower:find("shell") or nameLower:find("munic") or nameLower:find("cart") then
-        return "Ammo", targetPart
+        return "Ammo", targetPart, realName
     else
-        return "Weapon", targetPart
+        return "Weapon", targetPart, realName
     end
 end
 
@@ -330,8 +348,9 @@ end
 local function registerLootCandidate(obj)
     if not Config.LootESPEnabled then return end
     if trackedLoot[obj] then return end
-    local category, part = classifyRealLoot(obj)
+    local category, part, realName = classifyRealLoot(obj)
     if not category or not part then return end
+    if part:FindFirstChild("RoyLootText") then return end
 
     if (category == "Weapon" and not Config.LootWeapons)
     or (category == "Ammo" and not Config.LootAmmo)
@@ -343,7 +362,7 @@ local function registerLootCandidate(obj)
     local bill = Instance.new("BillboardGui")
     bill.Name = "RoyLootText"
     bill.Adornee = part
-    bill.Size = UDim2.new(0, 120, 0, 26)
+    bill.Size = UDim2.new(0, 140, 0, 28)
     bill.StudsOffset = Vector3.new(0, 1.8, 0)
     bill.MaxDistance = 400
     bill.AlwaysOnTop = true
@@ -352,10 +371,10 @@ local function registerLootCandidate(obj)
     local txt = Instance.new("TextLabel")
     txt.Size = UDim2.new(1, 0, 1, 0)
     txt.BackgroundTransparency = 1
-    txt.Text = obj.Name
+    txt.Text = realName
     txt.TextColor3 = color
     txt.TextStrokeTransparency = 0
-    txt.TextSize = 12
+    txt.TextSize = 13
     txt.Font = Enum.Font.GothamBold
     txt.Parent = bill
 
@@ -395,7 +414,7 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "ESP Loot Real (Otimizado)",
+    Name = "ESP Loot Real",
     CurrentValue = Config.LootESPEnabled,
     Flag = "LESP",
     Callback = function(v)
@@ -565,9 +584,6 @@ local counter = 0
 
 getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
     pcall(function()
-        if not LP or not LP.Character then return end
-        Cam = workspace.CurrentCamera
-        
         if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
@@ -576,7 +592,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
         local runPlayerESP = (counter % 6 == 0)
         local runLootCleanup = (counter % 90 == 0)
 
-        -- ESP Player & Antena
         if runPlayerESP then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -632,7 +647,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Limpeza leve do cache de loot (sem travar FPS)
         if runLootCleanup and Config.LootESPEnabled then
             for obj, gui in pairs(trackedLoot) do
                 if not obj or not obj.Parent or isPlayerCharacter(obj) then
@@ -642,7 +656,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Auto Kit Medico Real (Equipa e Dispara o uso)
         local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -679,17 +692,11 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Aimbot Restaurado (Legit / Proximal no Chao)
-        local canAim = Config.AimbotEnabled and hum and hum.FloorMaterial ~= Enum.Material.Air
-        if Config.AimOnlyFiring and not isFiring then
-            canAim = false
-        end
-
-        if canAim then
+        if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = char:FindFirstChild("HumanoidRootPart")
+            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character and myRoot then
@@ -717,17 +724,13 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
 
             if closestTarget then
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
-                local smooth = math.clamp(Config.AimbotStrength * 0.04, 0.05, 0.85)
                 local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
-                Cam.CFrame = Cam.CFrame:Lerp(targetCF, smooth)
+                Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
             else
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
             end
-        else
-            if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
         end
 
-        -- Auto-Switch
         if Config.AutoSwitchEnabled and char and backpack then
             local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
@@ -735,7 +738,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                 if ammoVal and ammoVal.Value <= 0 then
                     for _, tool in ipairs(backpack:GetChildren()) do
                         if tool:IsA("Tool") and not isMedTool(tool) then
-                            hum:EquipTool(tool)
+                            char.Humanoid:EquipTool(tool)
                             break
                         end
                     end
@@ -743,7 +746,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Voo Suave
         local rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
@@ -759,7 +761,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
-        -- Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -781,6 +782,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Atualizado e otimizado.",
+    Content = "Carregado.",
     Duration = 4
 })
