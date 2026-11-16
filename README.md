@@ -3,6 +3,9 @@ pcall(function()
         getgenv().RoyalityLoop:Disconnect()
         getgenv().RoyalityLoop = nil
     end
+    pcall(function()
+        game:GetService("RunService"):UnbindFromRenderStep("RoyalityAimLock")
+    end)
     if getgenv().RoyalityFOV then
         getgenv().RoyalityFOV:Remove()
         getgenv().RoyalityFOV = nil
@@ -256,6 +259,41 @@ T2:CreateToggle({
 local function trackVisual(inst)
     table.insert(getgenv().RoyalityVisuals, inst)
     return inst
+end
+
+local function isTargetAliveAndStanding(targetChar, hum)
+    if not targetChar or not targetChar.Parent or not hum then return false end
+    if hum.Health <= 0 then return false end
+
+    local state = hum:GetState()
+    if state == Enum.HumanoidStateType.Dead or state == Enum.HumanoidStateType.Physics then
+        return false
+    end
+
+    if hum.PlatformStand or hum.Sit then
+        return false
+    end
+
+    if targetChar:GetAttribute("Dead") == true
+        or targetChar:GetAttribute("Downed") == true
+        or targetChar:GetAttribute("Knocked") == true
+        or targetChar:GetAttribute("Eliminated") == true
+        or targetChar:GetAttribute("IsDead") == true then
+        return false
+    end
+
+    local parentName = targetChar.Parent and targetChar.Parent.Name:lower() or ""
+    if parentName:find("dead") or parentName:find("corpse") or parentName:find("ragdoll") or parentName:find("eliminat") then
+        return false
+    end
+
+    local head = targetChar:FindFirstChild("Head")
+    local rp = targetChar:FindFirstChild("HumanoidRootPart")
+    if head and rp and (head.Position.Y - rp.Position.Y) < 0.4 then
+        return false
+    end
+
+    return true
 end
 
 local botModels = {}
@@ -670,6 +708,7 @@ local function applyESPToCharacter(char)
     local head = char:FindFirstChild("Head")
     local hl = char:FindFirstChild("RoyESP")
     local antenna = char:FindFirstChild("RoyAntenna")
+    local alive = isTargetAliveAndStanding(char, hum)
 
     if Config.ESPEnabled then
         if not hl then
@@ -684,7 +723,7 @@ local function applyESPToCharacter(char)
         end
         hl.Enabled = true
 
-        if hum and hum.Health > 0 then
+        if alive then
             hl.FillColor = Color3.fromRGB(255, 0, 0)
         else
             hl.FillColor = Color3.fromRGB(0, 100, 255)
@@ -693,7 +732,7 @@ local function applyESPToCharacter(char)
         hl.Enabled = false
     end
 
-    if Config.ESPAntenna and head and hum and hum.Health > 0 then
+    if Config.ESPAntenna and head and alive then
         if not antenna then
             antenna = trackVisual(Instance.new("BillboardGui"))
             antenna.Name = "RoyAntenna"
@@ -715,17 +754,144 @@ local function applyESPToCharacter(char)
     end
 end
 
-local lastMedUse = 0
-local lastShotTime = 0
-local counter = 0
+local function getAimPartForChar(targetChar)
+    if Config.AimPart == "Head" then
+        return targetChar:FindFirstChild("Head") or targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Torso")
+    else
+        return targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
+    end
+end
 
-getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
+local function getPredictedPosition(targetChar, part)
+    local root = targetChar:FindFirstChild("HumanoidRootPart") or part
+    local vel = root.AssemblyLinearVelocity
+    if vel.Magnitude < 1.2 then
+        return part.Position
+    end
+    local dist = (part.Position - Cam.CFrame.Position).Magnitude
+    local leadTime = math.clamp(dist / 950, 0.02, 0.14)
+    local horizontalVel = Vector3.new(vel.X, vel.Y * 0.35, vel.Z)
+    return part.Position + (horizontalVel * leadTime)
+end
+
+local lockedChar = nil
+local lockedPlayer = nil
+local lockedTargetPart = nil
+
+local function isLockedTargetStillValid(myRoot, screenCenter)
+    if not lockedChar or not lockedChar.Parent or lockedChar == LP.Character or not myRoot then
+        return false
+    end
+    local pHum = lockedChar:FindFirstChildOfClass("Humanoid")
+    local part = getAimPartForChar(lockedChar)
+    local rp = lockedChar:FindFirstChild("HumanoidRootPart") or part
+    if not isTargetAliveAndStanding(lockedChar, pHum) or not part or not rp then
+        return false
+    end
+    if Config.TeamCheck and lockedPlayer and LP.Team and lockedPlayer.Team == LP.Team then
+        return false
+    end
+    local worldDist = (rp.Position - myRoot.Position).Magnitude
+    if worldDist > Config.MaxAimDistance then
+        return false
+    end
+    local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
+    if not onScreen then
+        return false
+    end
+    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+    if dist > (Config.FOVRadius * 1.15) then
+        return false
+    end
+    if not isVisible(part, lockedChar) then
+        return false
+    end
+    lockedTargetPart = part
+    return true
+end
+
+RunService:BindToRenderStep("RoyalityAimLock", Enum.RenderPriority.Camera.Value + 1, function(dt)
     pcall(function()
         Cam = workspace.CurrentCamera
         if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
 
+        if not (Config.AimbotEnabled or Config.AutoFireEnabled) then
+            lockedChar = nil
+            lockedPlayer = nil
+            lockedTargetPart = nil
+            return
+        end
+
+        local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
+        local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+
+        if not isLockedTargetStillValid(myRoot, screenCenter) then
+            lockedChar = nil
+            lockedPlayer = nil
+            lockedTargetPart = nil
+
+            local shortestDist = Config.FOVRadius
+
+            local function evaluateTarget(targetChar, targetPlayer)
+                if not targetChar or not targetChar.Parent or targetChar == LP.Character or not myRoot then return end
+                local pHum = targetChar:FindFirstChildOfClass("Humanoid")
+                local part = getAimPartForChar(targetChar)
+                local rp = targetChar:FindFirstChild("HumanoidRootPart") or part
+
+                if isTargetAliveAndStanding(targetChar, pHum) and part and rp then
+                    if Config.TeamCheck and targetPlayer and LP.Team and targetPlayer.Team == LP.Team then return end
+
+                    local worldDist = (rp.Position - myRoot.Position).Magnitude
+                    if worldDist <= Config.MaxAimDistance then
+                        local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
+                        if onScreen and isVisible(part, targetChar) then
+                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                            if dist < shortestDist then
+                                shortestDist = dist
+                                lockedChar = targetChar
+                                lockedPlayer = targetPlayer
+                                lockedTargetPart = part
+                            end
+                        end
+                    end
+                end
+            end
+
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character then
+                    evaluateTarget(p.Character, p)
+                end
+            end
+
+            for botChar, _ in pairs(botModels) do
+                if botChar and botChar.Parent then
+                    evaluateTarget(botChar, nil)
+                end
+            end
+        end
+
+        if Config.AimbotEnabled then
+            if lockedChar and lockedTargetPart then
+                if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
+                local aimPos = getPredictedPosition(lockedChar, lockedTargetPart)
+                local targetCF = CFrame.new(Cam.CFrame.Position, aimPos)
+                local alpha = math.clamp(1 - math.exp(-(Config.AimbotStrength * 2.4) * dt), 0.25, 1)
+                Cam.CFrame = Cam.CFrame:Lerp(targetCF, alpha)
+            else
+                if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
+            end
+        end
+    end)
+end)
+
+local lastMedUse = 0
+local lastShotTime = 0
+local counter = 0
+
+getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
+    pcall(function()
         counter = counter + 1
         local runPlayerESP = (counter % 6 == 0)
         local runLootCleanup = (counter % 90 == 0)
@@ -788,62 +954,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        local lockedTarget = nil
-        if Config.AimbotEnabled or Config.AutoFireEnabled then
-            local closestTarget = nil
-            local shortestDist = Config.FOVRadius
-            local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-
-            local function evaluateTarget(targetChar, targetPlayer)
-                if not targetChar or not targetChar.Parent or targetChar == LP.Character or not myRoot then return end
-                local pHum = targetChar:FindFirstChildOfClass("Humanoid")
-                local part = targetChar:FindFirstChild(Config.AimPart) or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("Head")
-                local rp = targetChar:FindFirstChild("HumanoidRootPart") or part
-
-                if pHum and pHum.Health > 0 and part and rp then
-                    if Config.TeamCheck and targetPlayer and LP.Team and targetPlayer.Team == LP.Team then return end
-
-                    local worldDist = (rp.Position - myRoot.Position).Magnitude
-                    if worldDist <= Config.MaxAimDistance then
-                        local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
-                        if onScreen and isVisible(part, targetChar) then
-                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                            if dist < shortestDist then
-                                shortestDist = dist
-                                closestTarget = part
-                            end
-                        end
-                    end
-                end
-            end
-
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    evaluateTarget(p.Character, p)
-                end
-            end
-
-            for botChar, _ in pairs(botModels) do
-                if botChar and botChar.Parent then
-                    evaluateTarget(botChar, nil)
-                end
-            end
-
-            lockedTarget = closestTarget
-
-            if Config.AimbotEnabled then
-                if closestTarget then
-                    if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
-                    local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
-                    Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
-                else
-                    if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
-                end
-            end
-        end
-
-        if Config.AutoFireEnabled and lockedTarget and char then
+        if Config.AutoFireEnabled and lockedTargetPart and char then
             local fireDelay = Config.RapidFireEnabled and 0.04 or 0.12
             if (tick() - lastShotTime) >= fireDelay then
                 lastShotTime = tick()
@@ -886,7 +997,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                 if p ~= LP and p.Character then
                     local pHum = p.Character:FindFirstChildOfClass("Humanoid")
                     local pRp = p.Character:FindFirstChild("HumanoidRootPart")
-                    if pHum and pHum.Health > 0 and pRp then
+                    if isTargetAliveAndStanding(p.Character, pHum) and pRp then
                         if not Config.TeamCheck or p.Team ~= LP.Team then
                             if (rp.Position - pRp.Position).Magnitude <= 20 then
                                 local tool = char:FindFirstChildOfClass("Tool")
@@ -900,7 +1011,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                 if botChar and botChar.Parent and botChar ~= LP.Character then
                     local pHum = botChar:FindFirstChildOfClass("Humanoid")
                     local pRp = botChar:FindFirstChild("HumanoidRootPart") or botChar:FindFirstChild("Head")
-                    if pHum and pHum.Health > 0 and pRp then
+                    if isTargetAliveAndStanding(botChar, pHum) and pRp then
                         if (rp.Position - pRp.Position).Magnitude <= 20 then
                             local tool = char:FindFirstChildOfClass("Tool")
                             if tool then pcall(function() tool:Activate() end) end
