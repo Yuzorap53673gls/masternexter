@@ -1,24 +1,14 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V21 (FIX DEFINITIVO: PERSISTÊNCIA APÓS MORTE)
+--// ROYALITY HUB | ULTIMATE V22 (CORREÇÃO DE TELA + REMOÇÃO DO FIND OWNER)
 --// ==========================================
 
-pcall(function()
-    if syn and syn.queue_on_teleport then
-        syn.queue_on_teleport(game:HttpGet(script_url or ""))
-    elseif queue_on_teleport then
-        queue_on_teleport([[
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
-        ]])
-    end
-end)
-
 local Success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 end)
 
 if not Success or not Rayfield then
     Success, Rayfield = pcall(function()
-        return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+        return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
     end)
 end
 
@@ -78,8 +68,6 @@ getgenv().Config = {
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
@@ -287,42 +275,6 @@ T4:CreateToggle({
                 end
             end
         end
-    end
-})
-
-T4:CreateButton({
-    Name = "Find Owner",
-    Callback = function()
-        Rayfield:Notify({
-            Title = "Buscando",
-            Content = "Procurando gabecriadomal...",
-            Duration = 3
-        })
-        
-        task.spawn(function()
-            local success, site = pcall(function()
-                return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-            end)
-            
-            local found = false
-            if success and site and site.data then
-                for _, server in ipairs(site.data) do
-                    if server.id ~= game.JobId then
-                        found = true
-                        TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LP)
-                        break
-                    end
-                end
-            end
-
-            if not found then
-                Rayfield:Notify({
-                    Title = "Owner",
-                    Content = "Owner not found",
-                    Duration = 4
-                })
-            end
-        end)
     end
 })
 
@@ -579,6 +531,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Carregado com persistência total.",
+    Content = "Interface carregada com sucesso.",
     Duration = 4
 })
