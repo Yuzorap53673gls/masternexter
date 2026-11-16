@@ -23,7 +23,7 @@ pcall(function()
         end
     end
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "RoyESP" or obj.Name == "RoyAntenna" or obj.Name == "RoyLootText" or obj.Name == "RoyLootESP" then
+        if obj.Name == "RoyESP" or obj.Name == "RoyAntenna" or obj.Name == "RoyNameTag" or obj.Name == "RoyLootText" or obj.Name == "RoyLootESP" then
             obj:Destroy()
         end
     end
@@ -62,6 +62,7 @@ getgenv().DefaultConfig = {
     LootWeapons = true,
     LootAmmo = true,
     LootMedKits = true,
+    LootArmor = true,
     AutoMedKit = false,
     AimbotEnabled = true,
     TeamCheck = false,
@@ -251,109 +252,151 @@ T2:CreateToggle({
     Callback = function(v) Config.KillAuraEnabled = v end
 })
 
+--// Sistema de Deteccao Universal de Inimigos (Players Reais + Bots/NPCs)
+local cachedCharacters = {}
+local lastCharScan = 0
+
+local function getAllEnemyCharacters()
+    if (tick() - lastCharScan) < 0.4 and #cachedCharacters > 0 then
+        return cachedCharacters
+    end
+    lastCharScan = tick()
+    local list = {}
+    local seen = {}
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                seen[p.Character] = true
+                table.insert(list, {
+                    char = p.Character,
+                    player = p,
+                    name = p.DisplayName or p.Name
+                })
+            end
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent and obj.Parent:IsA("Model") then
+            local model = obj.Parent
+            if model ~= LP.Character and not seen[model] then
+                local head = model:FindFirstChild("Head")
+                local rp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
+                if head and rp then
+                    seen[model] = true
+                    table.insert(list, {
+                        char = model,
+                        player = Players:GetPlayerFromCharacter(model),
+                        name = model.Name
+                    })
+                end
+            end
+        end
+    end
+
+    cachedCharacters = list
+    return list
+end
+
+local function getTargetAimPart(char)
+    if Config.AimPart == "Head" then
+        return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+    else
+        return char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+    end
+end
+
+--// Sistema de ESP de Loot Real (Ignora LootSpot vazio e le o nome real do item)
 local trackedLoot = {}
-local genericNames = {
+local ignoredSpawners = {
+    lootspot = true, loot = true, spawn = true, spawner = true,
+    itemspawn = true, weaponspawn = true, dropzone = true,
     handle = true, part = true, meshpart = true, union = true,
-    model = true, drop = true, item = true, loot = true,
-    pickup = true, hitbox = true, root = true, primarypart = true
+    hitbox = true, root = true, primarypart = true, attachment = true
 }
 
-local function isPlayerCharacter(inst)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character and inst:IsDescendantOf(p.Character) then
+local function isAnyCharacterDescendant(inst)
+    if LP.Character and inst:IsDescendantOf(LP.Character) then return true end
+    for _, entry in ipairs(cachedCharacters) do
+        if entry.char and inst:IsDescendantOf(entry.char) then
             return true
         end
     end
     return false
 end
 
-local function resolveRealItemName(obj)
+local function extractTrueItemName(obj)
+    -- 1. Procura BillboardGui/SurfaceGui do proprio jogo dentro do item (ex: AK-47, MP5, Colete, Kit Medico, Municao)
+    for _, desc in ipairs(obj:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Name ~= "RoyLootLabel" then
+            local rawTxt = desc.Text:gsub("<[^>]+>", ""):gsub("^%s*(.-)%s*$", "%1")
+            local low = rawTxt:lower()
+            if rawTxt ~= "" and #rawTxt > 1 and not ignoredSpawners[low] and not low:find("^%[") and not low:find("^pegar") and not low:find("^e %-") then
+                return rawTxt
+            end
+        end
+    end
+
+    -- 2. Procura atributos no objeto ou no modelo pai
     local curr = obj
     while curr and curr ~= workspace do
-        local attrName = curr:GetAttribute("ItemName") or curr:GetAttribute("DisplayName") or curr:GetAttribute("Name")
-        if type(attrName) == "string" and attrName ~= "" and not genericNames[attrName:lower()] then
-            return attrName
+        local attr = curr:GetAttribute("ItemName") or curr:GetAttribute("DisplayName") or curr:GetAttribute("WeaponName") or curr:GetAttribute("Title") or curr:GetAttribute("Name")
+        if type(attr) == "string" and attr ~= "" and not ignoredSpawners[attr:lower()] then
+            return attr
         end
 
         for _, child in ipairs(curr:GetChildren()) do
-            if child:IsA("StringValue") and (child.Name:lower():find("name") or child.Name:lower():find("item")) and child.Value ~= "" then
+            if child:IsA("StringValue") and child.Value ~= "" and not ignoredSpawners[child.Value:lower()] then
                 return child.Value
             end
         end
 
         local prompt = curr:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt then
-            if prompt.ObjectText and prompt.ObjectText ~= "" and not genericNames[prompt.ObjectText:lower()] then
+            if prompt.ObjectText ~= "" and not ignoredSpawners[prompt.ObjectText:lower()] then
                 return prompt.ObjectText
-            elseif prompt.ActionText and prompt.ActionText ~= "" and not genericNames[prompt.ActionText:lower()] then
+            end
+            if prompt.ActionText ~= "" and not ignoredSpawners[prompt.ActionText:lower()] then
                 return prompt.ActionText
             end
         end
 
-        if curr:IsA("Tool") then
+        if not ignoredSpawners[curr.Name:lower()] and curr ~= obj then
             return curr.Name
         end
 
         curr = curr.Parent
     end
 
-    local cleanName = obj.Name
-    if genericNames[cleanName:lower()] and obj.Parent and obj.Parent ~= workspace then
-        local parentName = obj.Parent.Name
-        if not genericNames[parentName:lower()] then
-            cleanName = parentName
-        end
+    if not ignoredSpawners[obj.Name:lower()] then
+        return obj.Name
     end
 
-    return cleanName
+    return nil
 end
 
-local function classifyRealLoot(obj)
-    if not obj or not obj.Parent or isPlayerCharacter(obj) then return nil, nil, nil, nil end
-    if obj:IsA("Terrain") or obj:IsA("Camera") or obj:IsA("Folder") then return nil, nil, nil, nil end
+local function classifyLootByRealName(realName)
+    local n = realName:lower()
 
-    local isRealItem = false
-    local targetPart = nil
-
-    if obj:IsA("Tool") then
-        targetPart = obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")
-        if targetPart then isRealItem = true end
-    elseif obj:IsA("Model") or obj:IsA("BasePart") then
-        local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-        local parentFolder = obj.Parent and obj.Parent.Name:lower() or ""
-        local inLootContainer = parentFolder:find("loot") or parentFolder:find("drop") or parentFolder:find("item") or parentFolder:find("pickup") or parentFolder:find("weapon") or parentFolder:find("gun")
-        if hasPrompt or inLootContainer or obj:IsA("Tool") then
-            if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") and trackedLoot[obj.Parent] then
-                return nil, nil, nil, nil
-            end
-            targetPart = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
-            if targetPart and targetPart.Size.Magnitude < 35 then
-                isRealItem = true
-            end
-        end
+    -- Kits Medicos / Cura -> Verde Neon
+    if n:find("med") or n:find("kit") or n:find("heal") or n:find("band") or n:find("cura") or n:find("vida") or n:find("syringe") or n:find("potion") or n:find("first") or n:find("medico") then
+        return "Med", Color3.fromRGB(0, 255, 110)
     end
 
-    if not isRealItem or not targetPart then return nil, nil, nil, nil end
-
-    local realName = resolveRealItemName(obj)
-    local nameLower = realName:lower()
-
-    local category, color
-    if nameLower:find("med") or nameLower:find("kit") or nameLower:find("heal") or nameLower:find("band") or nameLower:find("cura") or nameLower:find("vida") or nameLower:find("syringe") or nameLower:find("potion") or nameLower:find("first") then
-        category = "Med"
-        color = Color3.fromRGB(0, 255, 120) -- Verde vibrante para kits medicos
-    elseif nameLower:find("ammo") or nameLower:find("bullet") or nameLower:find("mag") or nameLower:find("shell") or nameLower:find("munic") or nameLower:find("cart") then
-        category = "Ammo"
-        color = Color3.fromRGB(0, 200, 255) -- Azul ciano para municao
-    elseif nameLower:find("gun") or nameLower:find("weapon") or nameLower:find("rifle") or nameLower:find("pistol") or nameLower:find("shotgun") or nameLower:find("sniper") or nameLower:find("smg") or obj:IsA("Tool") then
-        category = "Weapon"
-        color = Color3.fromRGB(255, 180, 0) -- Laranja dourado para armas
-    else
-        category = "Other"
-        color = Color3.fromRGB(200, 100, 255) -- Roxo para outros itens gerais
+    -- Municao -> Azul Ciano
+    if n:find("munic") or n:find("ammo") or n:find("bullet") or n:find("mag") or n:find("shell") or n:find("cart") or n:find("bala") or n:find("9mm") or n:find("556") or n:find("762") then
+        return "Ammo", Color3.fromRGB(0, 220, 255)
     end
 
-    return category, targetPart, realName, color
+    -- Coletes / Capacetes / Granadas / Equipamentos -> Amarelo Vibrante
+    if n:find("colete") or n:find("armor") or n:find("vest") or n:find("shield") or n:find("escudo") or n:find("capacete") or n:find("helmet") or n:find("granada") or n:find("grenade") or n:find("mochila") or n:find("bag") then
+        return "Armor", Color3.fromRGB(255, 240, 50)
+    end
+
+    -- Armas -> Laranja Dourado
+    return "Weapon", Color3.fromRGB(255, 145, 0)
 end
 
 local function clearLootVisuals()
@@ -365,32 +408,70 @@ end
 
 local function registerLootCandidate(obj)
     if not Config.LootESPEnabled then return end
-    if trackedLoot[obj] then return end
-    local category, part, realName, color = classifyRealLoot(obj)
-    if not category or not part then return end
-    if part:FindFirstChild("RoyLootText") then return end
+    if not obj or not obj.Parent or trackedLoot[obj] then return end
+    if isAnyCharacterDescendant(obj) then return end
+
+    local lowName = obj.Name:lower()
+    -- Ignora marcadores de spawner vazios (LootSpot, Loot, etc.)
+    if lowName == "lootspot" or lowName == "loot" or lowName == "spawner" then
+        return
+    end
+
+    local isCandidate = false
+    local targetPart = nil
+
+    if obj:IsA("Tool") then
+        targetPart = obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")
+        isCandidate = (targetPart ~= nil)
+    elseif obj:IsA("Model") or obj:IsA("BasePart") then
+        if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") and trackedLoot[obj.Parent] then
+            return
+        end
+        local parentLow = obj.Parent and obj.Parent.Name:lower() or ""
+        local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true) ~= nil
+        local hasGameUI = obj:FindFirstChildWhichIsA("BillboardGui", true) ~= nil
+        local inLootFolder = parentLow:find("loot") or parentLow:find("drop") or parentLow:find("item") or parentLow:find("pickup") or parentLow:find("weapon")
+
+        if hasPrompt or hasGameUI or inLootFolder then
+            targetPart = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
+            if targetPart and targetPart.Size.Magnitude < 25 then
+                isCandidate = true
+            end
+        end
+    end
+
+    if not isCandidate or not targetPart then return end
+    if targetPart:FindFirstChild("RoyLootText") then return end
+
+    local realName = extractTrueItemName(obj)
+    if not realName or ignoredSpawners[realName:lower()] then return end
+
+    local category, color = classifyLootByRealName(realName)
 
     if (category == "Weapon" and not Config.LootWeapons)
     or (category == "Ammo" and not Config.LootAmmo)
-    or (category == "Med" and not Config.LootMedKits) then
+    or (category == "Med" and not Config.LootMedKits)
+    or (category == "Armor" and not Config.LootArmor) then
         return
     end
 
     local bill = Instance.new("BillboardGui")
     bill.Name = "RoyLootText"
-    bill.Adornee = part
-    bill.Size = UDim2.new(0, 150, 0, 28)
-    bill.StudsOffset = Vector3.new(0, 1.8, 0)
+    bill.Adornee = targetPart
+    bill.Size = UDim2.new(0, 160, 0, 26)
+    bill.StudsOffset = Vector3.new(0, 2.3, 0)
     bill.MaxDistance = 400
     bill.AlwaysOnTop = true
-    bill.Parent = part
+    bill.Parent = targetPart
 
     local txt = Instance.new("TextLabel")
+    txt.Name = "RoyLootLabel"
     txt.Size = UDim2.new(1, 0, 1, 0)
     txt.BackgroundTransparency = 1
     txt.Text = realName
     txt.TextColor3 = color
     txt.TextStrokeTransparency = 0
+    txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     txt.TextSize = 13
     txt.Font = Enum.Font.GothamBold
     txt.Parent = bill
@@ -409,15 +490,18 @@ local function rebuildLootCache()
 end
 
 getgenv().RoyalityLootConn = workspace.DescendantAdded:Connect(function(obj)
-    if Config.LootESPEnabled and (obj:IsA("Tool") or obj:IsA("Model") or obj:IsA("BasePart")) then
-        task.defer(function()
-            registerLootCandidate(obj)
+    if Config.LootESPEnabled and (obj:IsA("Tool") or obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("TextLabel")) then
+        task.delay(0.15, function()
+            local target = obj:IsA("TextLabel") and obj:FindFirstAncestorWhichIsA("Model") or obj
+            if target then
+                registerLootCandidate(target)
+            end
         end)
     end
 end)
 
 T3:CreateToggle({
-    Name = "ESP Player",
+    Name = "ESP Player e Bots",
     CurrentValue = Config.ESPEnabled,
     Flag = "ESP",
     Callback = function(v) Config.ESPEnabled = v end
@@ -431,7 +515,7 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "ESP Loot Real com Cores",
+    Name = "ESP Loot Real (Nomes e Cores)",
     CurrentValue = Config.LootESPEnabled,
     Flag = "LESP",
     Callback = function(v)
@@ -445,7 +529,7 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "Filtro: Armas",
+    Name = "Filtro: Armas (Laranja)",
     CurrentValue = Config.LootWeapons,
     Flag = "LWEP",
     Callback = function(v)
@@ -455,7 +539,7 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "Filtro: Municao",
+    Name = "Filtro: Municao (Azul)",
     CurrentValue = Config.LootAmmo,
     Flag = "LAMM",
     Callback = function(v)
@@ -465,11 +549,21 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "Filtro: Kits Medicos",
+    Name = "Filtro: Kits Medicos (Verde)",
     CurrentValue = Config.LootMedKits,
     Flag = "LMED",
     Callback = function(v)
         Config.LootMedKits = v
+        if Config.LootESPEnabled then rebuildLootCache() end
+    end
+})
+
+T3:CreateToggle({
+    Name = "Filtro: Coletes e Granadas (Amarelo)",
+    CurrentValue = Config.LootArmor,
+    Flag = "LARM",
+    Callback = function(v)
+        Config.LootArmor = v
         if Config.LootESPEnabled then rebuildLootCache() end
     end
 })
@@ -531,156 +625,7 @@ T4:CreateButton({
                 return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
             end)
             
-            local foundServer = nil
-            if success and site and site.data then
-                for _, server in ipairs(site.data) do
-                    if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                        foundServer = server.id
-                        break
-                    end
-                end
-            end
-
-            if foundServer then
-                Rayfield:Notify({
-                    Title = "Encontrado",
-                    Content = "Teleportando...",
-                    Duration = 3
-                })
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, foundServer, LP)
-            else
-                Rayfield:Notify({
-                    Title = "Aviso",
-                    Content = "Owner fora de server publico.",
-                    Duration = 4
-                })
-            end
-        end)
-    end
-})
-
-T4:CreateButton({
-    Name = "Resetar Configuracoes",
-    Callback = function()
-        for k, v in pairs(DefaultConfig) do
-            Config[k] = v
-        end
-        clearLootVisuals()
-        Rayfield:Notify({
-            Title = "Reset",
-            Content = "Configuracoes restauradas.",
-            Duration = 3
-        })
-    end
-})
-
-local function isVisible(targetPart, targetCharacter)
-    if not Config.WallCheck then return true end
-    local origin = Cam.CFrame.Position
-    local direction = (targetPart.Position - origin)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {LP.Character, Cam}
-    raycastParams.IgnoreWater = true
-    
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    if result then
-        return result.Instance:IsDescendantOf(targetCharacter)
-    end
-    return true
-end
-
-local function isMedTool(tool)
-    if not tool or not tool:IsA("Tool") then return false end
-    local n = tool.Name:lower()
-    return n:find("med") or n:find("kit") or n:find("heal") or n:find("band") or n:find("cura") or n:find("vida") or n:find("syringe") or n:find("potion") or n:find("first")
-end
-
-local lastMedUse = 0
-local counter = 0
-
-getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
-    pcall(function()
-        if FOVCircle then
-            FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-        end
-
-        counter = counter + 1
-        local runPlayerESP = (counter % 6 == 0)
-        local runLootCleanup = (counter % 90 == 0)
-
-        if runPlayerESP then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    local char = p.Character
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    local head = char:FindFirstChild("Head")
-                    local hl = char:FindFirstChild("RoyESP")
-                    local antenna = char:FindFirstChild("RoyAntenna")
-                    
-                    
-                    if Config.ESPEnabled and char then
-                        if not hl then
-                            hl = Instance.new("Highlight")
-                            hl.Name = "RoyESP"
-                            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                            hl.FillTransparency = 0.5
-                            hl.OutlineTransparency = 0
-                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                            hl.Adornee = char
-                            hl.Parent = char
-                        end
-                        hl.Enabled = true
-                        
-                        if hum and hum.Health > 0 then
-                            hl.FillColor = Color3.fromRGB(255, 0, 0)
-                        else
-                            hl.FillColor = Color3.fromRGB(0, 100, 255)
-                        end
-                    elseif hl then
-                        hl.Enabled = false
-                    end
-
-                    if Config.ESPAntenna and head and hum and hum.Health > 0 then
-                        if not antenna then
-                            antenna = Instance.new("BillboardGui")
-                            antenna.Name = "RoyAntenna"
-                            antenna.Adornee = head
-                            antenna.Size = UDim2.new(0, 2, 0, 150)
-                            antenna.StudsOffset = Vector3.new(0, 8, 0)
-                            antenna.AlwaysOnTop = true
-                            antenna.Parent = head
-
-                            local line = Instance.new("Frame")
-                            line.Size = UDim2.new(1, 0, 1, 0)
-                            line.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-                            line.BorderSizePixel = 0
-                            line.Parent = antenna
-                        end
-                        antenna.Enabled = true
-                    elseif antenna then
-                        antenna.Enabled = false
-                    end
-                end
-            end
-        end
-
-        if runLootCleanup and Config.LootESPEnabled then
-            for obj, gui in pairs(trackedLoot) do
-                if not obj or not obj.Parent or isPlayerCharacter(obj) then
-                    if gui and gui.Parent then gui:Destroy() end
-                    trackedLoot[obj] = nil
-                end
-            end
-        end
-
-        local char = LP.Character
-        local backpack = LP:FindFirstChildOfClass("Backpack")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
-            if (tick() - lastMedUse) >= 0.25 then
-                local equipped = char:FindFirstChildOfClass("Tool")
-                local medTool = nil
+                            local medTool = nil
 
                 if isMedTool(equipped) then
                     medTool = equipped
@@ -710,25 +655,30 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
+        -- Aimbot Inteligente (Players Reais + Bots/NPCs + R6/R15)
         if Config.AimbotEnabled then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
 
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character and myRoot then
-                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
-                    local part = p.Character:FindFirstChild(Config.AimPart) or p.Character:FindFirstChild("Head")
-                    local rp = p.Character:FindFirstChild("HumanoidRootPart")
-                    
-                    if pHum and pHum.Health > 0 and part and rp then
-                        if Config.TeamCheck and p.Team == LP.Team then continue end
-                        
+            for _, entry in ipairs(enemies) do
+                local eChar = entry.char
+                local ePlayer = entry.player
+                if eChar and eChar.Parent and myRoot then
+                    local eHum = eChar:FindFirstChildOfClass("Humanoid")
+                    local part = getTargetAimPart(eChar)
+                    local rp = eChar:FindFirstChild("HumanoidRootPart") or part
+
+                    if eHum and eHum.Health > 0 and part and rp then
+                        if Config.TeamCheck and ePlayer and LP.Team and ePlayer.Team == LP.Team then
+                            continue
+                        end
+
                         local worldDist = (rp.Position - myRoot.Position).Magnitude
                         if worldDist <= Config.MaxAimDistance then
                             local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
-                            if onScreen and isVisible(part, p.Character) then
+                            if onScreen and isVisible(part, eChar) then
                                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
                                 if dist < shortestDist then
                                     shortestDist = dist
@@ -749,6 +699,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
+        -- Auto-Switch Weapon
         if Config.AutoSwitchEnabled and char and backpack then
             local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
@@ -764,6 +715,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
+        -- Voo
         local rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
@@ -779,14 +731,17 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
+        -- Kill Aura (Players Reais + Bots/NPCs)
         if Config.KillAuraEnabled and rp and hum then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    local pHum = p.Character:FindFirstChildOfClass("Humanoid")
-                    local pRp = p.Character:FindFirstChild("HumanoidRootPart")
-                    if pHum and pHum.Health > 0 and pRp then
-                        if not Config.TeamCheck or p.Team ~= LP.Team then
-                            if (rp.Position - pRp.Position).Magnitude <= 20 then
+            for _, entry in ipairs(enemies) do
+                local eChar = entry.char
+                local ePlayer = entry.player
+                if eChar and eChar.Parent then
+                    local eHum = eChar:FindFirstChildOfClass("Humanoid")
+                    local eRp = eChar:FindFirstChild("HumanoidRootPart") or eChar:FindFirstChild("Head")
+                    if eHum and eHum.Health > 0 and eRp then
+                        if not Config.TeamCheck or not ePlayer or not LP.Team or ePlayer.Team ~= LP.Team then
+                            if (rp.Position - eRp.Position).Magnitude <= 20 then
                                 local tool = char:FindFirstChildOfClass("Tool")
                                 if tool then pcall(function() tool:Activate() end) end
                             end
