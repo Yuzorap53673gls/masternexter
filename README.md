@@ -1,14 +1,9 @@
---// ==========================================
---// ROYALITY HUB | ULTIMATE V30 (FIX DEFINITIVO DE TELA + COMPLETO)
---// ==========================================
-
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Royality Hub",
     Text = "Iniciando menu...",
     Duration = 3
 })
 
--- Limpeza de instâncias e loops anteriores na memória
 pcall(function()
     if getgenv().RoyalityLoop then
         getgenv().RoyalityLoop:Disconnect()
@@ -25,7 +20,6 @@ pcall(function()
     end
 end)
 
--- Carregamento blindado do Rayfield com 3 fontes de backup
 local Rayfield = nil
 local urls = {
     "https://sirius.menu/rayfield",
@@ -46,13 +40,12 @@ end
 if not Rayfield then
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Erro de Rede",
-        Text = "O Delta não conseguiu baixar o Rayfield. Verifique sua conexão ou VPN.",
+        Text = "Falha ao baixar o Rayfield.",
         Duration = 6
     })
     return
 end
 
---// Configurações Padrões
 getgenv().DefaultConfig = {
     ESPEnabled = true,
     ESPAntenna = true,
@@ -78,7 +71,6 @@ getgenv().DefaultConfig = {
     NoFogEnabled = false
 }
 
--- Mantém alterações salvas na memória do executor entre reexecuções
 if not getgenv().Config then
     getgenv().Config = {}
     for k, v in pairs(getgenv().DefaultConfig) do
@@ -96,7 +88,6 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
--- Círculo FOV
 local FOVCircle = nil
 pcall(function()
     if Drawing then
@@ -112,11 +103,10 @@ pcall(function()
     end
 end)
 
--- Janela Principal (ConfigurationSaving desativado para não travar no Delta Mobile)
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate",
+    Name = "Royality Hub",
     LoadingTitle = "Royality Hub",
-    LoadingSubtitle = "Delta Executor",
+    LoadingSubtitle = "Delta",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
@@ -126,9 +116,8 @@ local T2 = Window:CreateTab("Movimento", 4483345998)
 local T3 = Window:CreateTab("Visual & Loot", 4483345998)
 local T4 = Window:CreateTab("Sistema & Owner", 4483345998)
 
---// Aba Combate
 T1:CreateToggle({
-    Name = "Aimbot (Ativa apenas no Chão)",
+    Name = "Aimbot (Chao)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
@@ -155,7 +144,7 @@ T1:CreateSlider({
 })
 
 T1:CreateSlider({
-    Name = "Força Puxada",
+    Name = "Forca Puxada",
     Range = {1, 20},
     Increment = 1,
     CurrentValue = Config.AimbotStrength,
@@ -165,12 +154,12 @@ T1:CreateSlider({
 
 T1:CreateDropdown({
     Name = "Parte Alvo",
-    Options = {"Cabeça", "Peito"},
-    CurrentOption = Config.AimPart == "Head" and "Cabeça" or "Peito",
+    Options = {"Cabeca", "Peito"},
+    CurrentOption = Config.AimPart == "Head" and "Cabeca" or "Peito",
     Flag = "AP",
     Callback = function(o)
         local choice = type(o) == "table" and o[1] or o
-        Config.AimPart = choice == "Cabeça" and "Head" or "UpperTorso"
+        Config.AimPart = choice == "Cabeca" and "Head" or "UpperTorso"
     end
 })
 
@@ -201,7 +190,7 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
-    Name = "Auto Kit Médico (Instantâneo)",
+    Name = "Auto Kit Medico",
     CurrentValue = Config.AutoMedKit,
     Flag = "AMK",
     Callback = function(v) Config.AutoMedKit = v end
@@ -224,7 +213,6 @@ T1:CreateSlider({
     Callback = function(v) Config.DamageMultiplier = v end
 })
 
---// Aba Movimento
 T2:CreateToggle({
     Name = "Voo Suave",
     CurrentValue = Config.FlyEnabled,
@@ -254,7 +242,6 @@ T2:CreateToggle({
     Callback = function(v) Config.KillAuraEnabled = v end
 })
 
---// Aba Visual & Loot
 T3:CreateToggle({
     Name = "ESP Player",
     CurrentValue = Config.ESPEnabled,
@@ -270,35 +257,35 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "ESP Loot Geral (Itens/Armas)",
+    Name = "ESP Loot Geral",
     CurrentValue = Config.LootESPEnabled,
     Flag = "LESP",
     Callback = function(v) Config.LootESPEnabled = v end
 })
 
 T3:CreateToggle({
-    Name = "Filtro: Mostrar Armas",
+    Name = "Filtro: Armas",
     CurrentValue = Config.LootWeapons,
     Flag = "LWEP",
     Callback = function(v) Config.LootWeapons = v end
 })
 
 T3:CreateToggle({
-    Name = "Filtro: Mostrar Munição",
+    Name = "Filtro: Municao",
     CurrentValue = Config.LootAmmo,
     Flag = "LAMM",
     Callback = function(v) Config.LootAmmo = v end
 })
 
 T3:CreateToggle({
-    Name = "Filtro: Mostrar Kits Médicos",
+    Name = "Filtro: Kits Medicos",
     CurrentValue = Config.LootMedKits,
     Flag = "LMED",
     Callback = function(v) Config.LootMedKits = v end
 })
 
 T3:CreateToggle({
-    Name = "Remover Neblina (No Fog)",
+    Name = "Remover Neblina",
     CurrentValue = Config.NoFogEnabled,
     Flag = "NFOG",
     Callback = function(v)
@@ -310,7 +297,6 @@ T3:CreateToggle({
     end
 })
 
---// Aba Sistema & Owner
 T4:CreateToggle({
     Name = "Anti-Lag Booster",
     CurrentValue = Config.AntiLagEnabled,
@@ -331,9 +317,9 @@ T4:CreateButton({
     Name = "Find Owner (gabecriadomal)",
     Callback = function()
         Rayfield:Notify({
-            Title = "Buscando Owner",
-            Content = "Procurando gabecriadomal em servidores públicos...",
-            Duration = 4
+            Title = "Buscando",
+            Content = "Procurando gabecriadomal...",
+            Duration = 3
         })
         
         task.spawn(function()
@@ -345,7 +331,7 @@ T4:CreateButton({
             if not successId or not targetUserId then
                 Rayfield:Notify({
                     Title = "Erro",
-                    Content = "Usuário não encontrado.",
+                    Content = "Usuario nao encontrado.",
                     Duration = 4
                 })
                 return
@@ -367,16 +353,16 @@ T4:CreateButton({
 
             if foundServer then
                 Rayfield:Notify({
-                    Title = "Servidor Encontrado!",
-                    Content = "Entrando no servidor público...",
-                    Duration = 4
+                    Title = "Encontrado",
+                    Content = "Teleportando...",
+                    Duration = 3
                 })
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, foundServer, LP)
             else
                 Rayfield:Notify({
                     Title = "Aviso",
-                    Content = "gabecriadomal não está em servidores públicos (pode estar em privado ou offline).",
-                    Duration = 5
+                    Content = "Owner fora de server publico.",
+                    Duration = 4
                 })
             end
         end)
@@ -384,20 +370,19 @@ T4:CreateButton({
 })
 
 T4:CreateButton({
-    Name = "Resetar Configurações",
+    Name = "Resetar Configuracoes",
     Callback = function()
         for k, v in pairs(DefaultConfig) do
             Config[k] = v
         end
         Rayfield:Notify({
             Title = "Reset",
-            Content = "Configurações restauradas.",
+            Content = "Configuracoes restauradas.",
             Duration = 3
         })
     end
 })
 
---// Função WallCheck
 local function isVisible(targetPart, targetCharacter)
     if not Config.WallCheck then return true end
     local origin = Cam.CFrame.Position
@@ -414,7 +399,6 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal
 local counter = 0
 getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
     pcall(function()
@@ -429,7 +413,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
         local runHeavyTasks = (counter % 5 == 0)
 
         if runHeavyTasks then
-            -- ESP Player & Antena
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
                     local char = p.Character
@@ -483,7 +466,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                 end
             end
 
-            -- ESP Loot com Filtros
             if Config.LootESPEnabled then
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     local nameLower = obj.Name:lower()
@@ -518,7 +500,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Auto Kit Médico Instantâneo
         local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -534,7 +515,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Aimbot no Chão
         if Config.AimbotEnabled and hum and hum.FloorMaterial ~= Enum.Material.Air then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
@@ -576,7 +556,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
         end
 
-        -- Auto-Switch
         if Config.AutoSwitchEnabled and char and backpack then
             local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
@@ -590,10 +569,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                     end
                 end
             end
-        end
-
-        -- Voo
-        local rp = char and char:FindFirstChild("HumanoidRootPart")
+        endlocal rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
             rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -608,7 +584,6 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
-        -- Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -629,7 +604,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub V30",
-    Content = "Menu aberto e configurações salvas na memória!",
+    Title = "Royality Hub",
+    Content = "Carregado.",
     Duration = 4
 })
