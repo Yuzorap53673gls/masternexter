@@ -1,12 +1,21 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V23 (FIX: REEXECUÇÃO NO LOBBY)
+--// ROYALITY HUB | V25 (ESTABILIDADE DE LOBBY E MEMÓRIA)
 --// ==========================================
 
--- Limpa interfaces antigas presas na memória para permitir reexecução no lobby
+-- 1. Limpeza de memória de execuções anteriores (FOV, Menus e ESPs antigos)
 pcall(function()
+    if getgenv().RoyalityFOV then
+        getgenv().RoyalityFOV:Remove()
+        getgenv().RoyalityFOV = nil
+    end
     for _, v in ipairs(game:GetService("CoreGui"):GetChildren()) do
         if v.Name:lower():find("rayfield") or v.Name:lower():find("royality") then
             v:Destroy()
+        end
+    end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "RoyESP" or obj.Name == "RoyAntenna" or obj.Name == "RoyLootESP" or obj.Name == "RoyLootText" then
+            obj:Destroy()
         end
     end
 end)
@@ -24,7 +33,7 @@ end
 if not Rayfield then
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Erro",
-        Text = "Falha ao carregar Rayfield.",
+        Text = "Falha ao carregar interface.",
         Duration = 5
     })
     return
@@ -52,27 +61,10 @@ getgenv().DefaultConfig = {
     NoFogEnabled = false
 }
 
-getgenv().Config = {
-    ESPEnabled = true,
-    ESPAntenna = true,
-    LootESPEnabled = false,
-    AutoMedKit = false,
-    AimbotEnabled = true,
-    TeamCheck = false,
-    WallCheck = true,
-    MaxAimDistance = 250,
-    AimPart = "Head",
-    FOVRadius = 400,
-    AimbotStrength = 15,
-    RapidFireEnabled = false,
-    AutoSwitchEnabled = false,
-    DamageMultiplier = 3.0,
-    FlyEnabled = false,
-    FlySpeed = 60,
-    KillAuraEnabled = false,
-    AntiLagEnabled = false,
-    NoFogEnabled = false
-}
+getgenv().Config = {}
+for k, v in pairs(getgenv().DefaultConfig) do
+    getgenv().Config[k] = v
+end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -81,17 +73,19 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
+-- Criação segura do Círculo FOV salva em variável global para limpeza futura
 local FOVCircle = nil
 pcall(function()
     if Drawing then
         FOVCircle = Drawing.new("Circle")
-        FOVCircle.Visible = true
+        FOVCircle.Visible = Config.AimbotEnabled
         FOVCircle.Transparency = 0.6
         FOVCircle.Color = Color3.fromRGB(255, 50, 50)
         FOVCircle.Thickness = 1.8
         FOVCircle.NumSides = 32
         FOVCircle.Radius = Config.FOVRadius
         FOVCircle.Filled = false
+        getgenv().RoyalityFOV = FOVCircle
     end
 end)
 
@@ -151,7 +145,8 @@ T1:CreateDropdown({
     CurrentOption = "Cabeça",
     Flag = "AP",
     Callback = function(o)
-        Config.AimPart = o == "Cabeça" and "Head" or "UpperTorso"
+        local choice = type(o) == "table" and o[1] or o
+        Config.AimPart = choice == "Cabeça" and "Head" or "UpperTorso"
     end
 })
 
@@ -258,21 +253,24 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "Remover Neblina (No Fog)",
+    Name = "Remover Neblina",
     CurrentValue = Config.NoFogEnabled,
     Flag = "NFOG",
     Callback = function(v)
         Config.NoFogEnabled = v
         if v then
-            Lighting.FogEnd = 999999
-            pcall(function() Lighting.Atmosphere:Destroy() end)
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 99999
+        else
+            Lighting.FogEnd = 1000
+            Lighting.FogStart = 0
         end
     end
 })
 
 --// Aba Sistema
 T4:CreateToggle({
-    Name = "Anti-Lag Booster",
+    Name = "Anti-Lag",
     CurrentValue = Config.AntiLagEnabled,
     Flag = "ALAG",
     Callback = function(v)
@@ -318,31 +316,42 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Persistente com Reconexão Automática de Personagem
+--// Gerenciador de Conexão Única (Evita loops duplicados ao reexecutar)
+if getgenv().RoyalityLoop then
+    getgenv().RoyalityLoop:Disconnect()
+    getgenv().RoyalityLoop = nil
+end
+
 local counter = 0
-RunService.RenderStepped:Connect(function(dt)
-    pcall(function()
-        local character = LP.Character
-        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-        
-        if FOVCircle then
+getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
+    Cam = workspace.CurrentCamera
+    if not Cam then return end
+
+    if FOVCircle then
+        pcall(function()
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-        end
+        end)
+    end
 
-        counter = counter + 1
-        local runHeavyTasks = (counter % 5 == 0)
+    local character = LP.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hum = character:FindFirstChildOfClass("Humanoid")
 
-        if runHeavyTasks then
-            -- ESP Player & Antena
+    counter = counter + 1
+    local runHeavyTasks = (counter % 10 == 0)
+
+    -- 1. ESP & Loot (Isolado em pcall próprio)
+    if runHeavyTasks then
+        pcall(function()
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
                     local pChar = p.Character
-                    local hum = pChar:FindFirstChildOfClass("Humanoid")
+                    local pHum = pChar:FindFirstChildOfClass("Humanoid")
                     local head = pChar:FindFirstChild("Head")
                     local hl = pChar:FindFirstChild("RoyESP")
                     local antenna = pChar:FindFirstChild("RoyAntenna")
                     
-                    if Config.ESPEnabled and pChar then
+                    if Config.ESPEnabled then
                         if not hl then
                             hl = Instance.new("Highlight")
                             hl.Name = "RoyESP"
@@ -354,17 +363,12 @@ RunService.RenderStepped:Connect(function(dt)
                             hl.Parent = pChar
                         end
                         hl.Enabled = true
-                        
-                        if hum and hum.Health > 0 then
-                            hl.FillColor = Color3.fromRGB(255, 0, 0)
-                        else
-                            hl.FillColor = Color3.fromRGB(0, 100, 255)
-                        end
+                        hl.FillColor = (pHum and pHum.Health > 0) and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 100, 255)
                     elseif hl then
                         hl.Enabled = false
                     end
 
-                    if Config.ESPAntenna and head and hum and hum.Health > 0 then
+                    if Config.ESPAntenna and head and pHum and pHum.Health > 0 then
                         if not antenna then
                             antenna = Instance.new("BillboardGui")
                             antenna.Name = "RoyAntenna"
@@ -387,64 +391,52 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end
 
-            -- ESP Loot
+            -- ESP Loot usando BillboardGui leve (não estoura o limite de 31 Highlights do Roblox)
             if Config.LootESPEnabled then
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     if obj:IsA("Tool") or obj.Name:lower():find("gun") or obj.Name:lower():find("weapon") or obj.Name:lower():find("ammo") or obj.Name:lower():find("medkit") then
                         local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or (obj:IsA("BasePart") and obj)
-                        if part then
-                            local lootHl = obj:FindFirstChild("RoyLootESP")
-                            if not lootHl then
-                                lootHl = Instance.new("Highlight")
-                                lootHl.Name = "RoyLootESP"
-                                lootHl.FillColor = Color3.fromRGB(255, 255, 0)
-                                lootHl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                                lootHl.FillTransparency = 0.4
-                                lootHl.Adornee = obj
-                                lootHl.Parent = obj
+                        if part and not part:FindFirstChild("RoyLootText") then
+                            local bill = Instance.new("BillboardGui")
+                            bill.Name = "RoyLootText"
+                            bill.Adornee = part
+                            bill.Size = UDim2.new(0, 100, 0, 30)
+                            bill.StudsOffset = Vector3.new(0, 2, 0)
+                            bill.AlwaysOnTop = true
+                            bill.Parent = part
 
-                                local bill = Instance.new("BillboardGui")
-                                bill.Name = "RoyLootText"
-                                bill.Adornee = part
-                                bill.Size = UDim2.new(0, 100, 0, 30)
-                                bill.StudsOffset = Vector3.new(0, 2, 0)
-                                bill.AlwaysOnTop = true
-                                bill.Parent = part
-
-                                local txt = Instance.new("TextLabel")
-                                txt.Size = UDim2.new(1, 0, 1, 0)
-                                txt.BackgroundTransparency = 1
-                                txt.Text = obj.Name
-                                txt.TextColor3 = Color3.fromRGB(255, 255, 0)
-                                txt.TextStrokeTransparency = 0
-                                txt.TextSize = 13
-                                txt.Font = Enum.Font.GothamBold
-                                txt.Parent = bill
-                            end
-                            lootHl.Enabled = true
+                            local txt = Instance.new("TextLabel")
+                            txt.Size = UDim2.new(1, 0, 1, 0)
+                            txt.BackgroundTransparency = 1
+                            txt.Text = "[LOOT] " .. obj.Name
+                            txt.TextColor3 = Color3.fromRGB(255, 255, 0)
+                            txt.TextStrokeTransparency = 0
+                            txt.TextSize = 12
+                            txt.Font = Enum.Font.GothamBold
+                            txt.Parent = bill
                         end
                     end
                 end
             end
-        end
+        end)
+    end
 
-        -- Auto Kit Médico
+    -- 2. Auto Kit Médico (Isolado)
+    pcall(function()
         local backpack = LP:FindFirstChildOfClass("Backpack")
-        local hum = character:FindFirstChildOfClass("Humanoid")
-        if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
-            if backpack then
-                for _, tool in ipairs(backpack:GetChildren()) do
-                    if tool:IsA("Tool") and (tool.Name:lower():find("med") or tool.Name:lower():find("kit") or tool.Name:lower():find("heal") or tool.Name:lower():find("bandage")) then
-                        hum:EquipTool(tool)
-                        task.wait(0.1)
-                        pcall(function() tool:Activate() end)
-                        break
-                    end
+        if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth and backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") and (tool.Name:lower():find("med") or tool.Name:lower():find("kit") or tool.Name:lower():find("heal") or tool.Name:lower():find("bandage")) then
+                    hum:EquipTool(tool)
+                    tool:Activate()
+                    break
                 end
             end
         end
+    end)
 
-        -- Aimbot (Ativa apenas no chão, ignorando avião/ar)
+    -- 3. Aimbot no Chão (Isolado)
+    pcall(function()
         if Config.AimbotEnabled and hum and hum.FloorMaterial ~= Enum.Material.Air then
             local closestTarget = nil
             local shortestDist = Config.FOVRadius
@@ -485,9 +477,12 @@ RunService.RenderStepped:Connect(function(dt)
         else
             if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
         end
+    end)
 
-        -- Auto-Switch
-        if Config.AutoSwitchEnabled and character and backpack then
+    -- 4. Auto-Switch, Voo e Kill Aura (Isolados)
+    pcall(function()
+        local backpack = LP:FindFirstChildOfClass("Backpack")
+        if Config.AutoSwitchEnabled and backpack and hum then
             local currentTool = character:FindFirstChildOfClass("Tool")
             if currentTool then
                 local ammoVal = currentTool:FindFirstChild("Ammo") or currentTool:FindFirstChild("Clip") or currentTool:FindFirstChild("Bullets")
@@ -502,7 +497,6 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Voo
         local rp = character:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
@@ -518,7 +512,6 @@ RunService.RenderStepped:Connect(function(dt)
             rp.CFrame = rp.CFrame + (flyVec * Config.FlySpeed * dt)
         end
 
-        -- Kill Aura
         if Config.KillAuraEnabled and rp and hum then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
@@ -528,7 +521,7 @@ RunService.RenderStepped:Connect(function(dt)
                         if not Config.TeamCheck or p.Team ~= LP.Team then
                             if (rp.Position - pRp.Position).Magnitude <= 20 then
                                 local tool = character:FindFirstChildOfClass("Tool")
-                                if tool then pcall(function() tool:Activate() end) end
+                                if tool then tool:Activate() end
                             end
                         end
                     end
@@ -540,6 +533,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Carregado e pronto para o lobby.",
+    Content = "Pronto e limpo para múltiplas partidas.",
     Duration = 4
 })
