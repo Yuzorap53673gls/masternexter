@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V17 (ANTI-CRASH & LIMPO)
+--// ROYALITY HUB | ULTIMATE V18 (FIX: EXECUÇÃO CONTÍNUA)
 --// ==========================================
 
 pcall(function()
@@ -321,9 +321,11 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal
+--// Loop Principal Persistente (Blindado contra paradas)
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
+        if not LP or not LP.Character then return end
+        
         if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
         end
@@ -531,6 +533,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Carregado com sucesso.",
+    Content = "Carregado e persistente.",
     Duration = 4
 })
