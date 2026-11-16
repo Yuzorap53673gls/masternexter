@@ -1,7 +1,14 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V29 (DEFINITIVE FIX: UI VISÍVEL + COMPLETO)
+--// ROYALITY HUB | ULTIMATE V30 (FIX DEFINITIVO DE TELA + COMPLETO)
 --// ==========================================
 
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Royality Hub",
+    Text = "Iniciando menu...",
+    Duration = 3
+})
+
+-- Limpeza de instâncias e loops anteriores na memória
 pcall(function()
     if getgenv().RoyalityLoop then
         getgenv().RoyalityLoop:Disconnect()
@@ -18,26 +25,34 @@ pcall(function()
     end
 end)
 
-local Success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-end)
+-- Carregamento blindado do Rayfield com 3 fontes de backup
+local Rayfield = nil
+local urls = {
+    "https://sirius.menu/rayfield",
+    "https://raw.githubusercontent.com/shlexware/Rayfield/main/source",
+    "https://raw.githubusercontent.com/UI-Interface/CustomFIeld/main/RayField.lua"
+}
 
-if not Success or not Rayfield then
-    Success, Rayfield = pcall(function()
-        return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+for _, url in ipairs(urls) do
+    local ok, res = pcall(function()
+        return loadstring(game:HttpGet(url))()
     end)
+    if ok and res then
+        Rayfield = res
+        break
+    end
 end
 
 if not Rayfield then
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Erro Crítico",
-        Text = "Falha ao carregar a interface Rayfield.",
+        Title = "Erro de Rede",
+        Text = "O Delta não conseguiu baixar o Rayfield. Verifique sua conexão ou VPN.",
         Duration = 6
     })
     return
 end
 
---// Configurações Padrões e Sistema de Salvamento
+--// Configurações Padrões
 getgenv().DefaultConfig = {
     ESPEnabled = true,
     ESPAntenna = true,
@@ -63,31 +78,15 @@ getgenv().DefaultConfig = {
     NoFogEnabled = false
 }
 
-getgenv().Config = {
-    ESPEnabled = true,
-    ESPAntenna = true,
-    LootESPEnabled = false,
-    LootWeapons = true,
-    LootAmmo = true,
-    LootMedKits = true,
-    AutoMedKit = false,
-    AimbotEnabled = true,
-    TeamCheck = false,
-    WallCheck = true,
-    MaxAimDistance = 250,
-    AimPart = "Head",
-    FOVRadius = 400,
-    AimbotStrength = 15,
-    RapidFireEnabled = false,
-    AutoSwitchEnabled = false,
-    DamageMultiplier = 3.0,
-    FlyEnabled = false,
-    FlySpeed = 60,
-    KillAuraEnabled = false,
-    AntiLagEnabled = false,
-    NoFogEnabled = false
-}
+-- Mantém alterações salvas na memória do executor entre reexecuções
+if not getgenv().Config then
+    getgenv().Config = {}
+    for k, v in pairs(getgenv().DefaultConfig) do
+        getgenv().Config[k] = v
+    end
+end
 
+local Config = getgenv().Config
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -97,11 +96,12 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
+-- Círculo FOV
 local FOVCircle = nil
 pcall(function()
     if Drawing then
         FOVCircle = Drawing.new("Circle")
-        FOVCircle.Visible = true
+        FOVCircle.Visible = Config.AimbotEnabled
         FOVCircle.Transparency = 0.6
         FOVCircle.Color = Color3.fromRGB(255, 50, 50)
         FOVCircle.Thickness = 1.8
@@ -112,15 +112,12 @@ pcall(function()
     end
 end)
 
+-- Janela Principal (ConfigurationSaving desativado para não travar no Delta Mobile)
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Edition",
-    LoadingTitle = "Carregando Módulos...",
+    Name = "Royality Hub | Ultimate",
+    LoadingTitle = "Royality Hub",
     LoadingSubtitle = "Delta Executor",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "RoyalityHubConfigs",
-        FileName = "RoyalitySettings"
-    },
+    ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
 
@@ -169,7 +166,7 @@ T1:CreateSlider({
 T1:CreateDropdown({
     Name = "Parte Alvo",
     Options = {"Cabeça", "Peito"},
-    CurrentOption = "Cabeça",
+    CurrentOption = Config.AimPart == "Head" and "Cabeça" or "Peito",
     Flag = "AP",
     Callback = function(o)
         local choice = type(o) == "table" and o[1] or o
@@ -348,7 +345,7 @@ T4:CreateButton({
             if not successId or not targetUserId then
                 Rayfield:Notify({
                     Title = "Erro",
-                    Content = "Não foi possível encontrar o usuário.",
+                    Content = "Usuário não encontrado.",
                     Duration = 4
                 })
                 return
@@ -378,7 +375,7 @@ T4:CreateButton({
             else
                 Rayfield:Notify({
                     Title = "Aviso",
-                    Content = "gabecriadomal não está em servidores públicos (pode estar em server privado).",
+                    Content = "gabecriadomal não está em servidores públicos (pode estar em privado ou offline).",
                     Duration = 5
                 })
             end
@@ -417,11 +414,12 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Otimizado
+--// Loop Principal
 local counter = 0
 getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         if not LP or not LP.Character then return end
+        Cam = workspace.CurrentCamera
         
         if FOVCircle then
             FOVCircle.Position = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
@@ -485,7 +483,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                 end
             end
 
-            -- ESP Loot com Filtros Detalhados
+            -- ESP Loot com Filtros
             if Config.LootESPEnabled then
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     local nameLower = obj.Name:lower()
@@ -495,43 +493,32 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
 
                     if isWeapon or isAmmo or isMed then
                         local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or (obj:IsA("BasePart") and obj)
-                        if part then
-                            local lootHl = obj:FindFirstChild("RoyLootESP")
-                            if not lootHl then
-                                lootHl = Instance.new("Highlight")
-                                lootHl.Name = "RoyLootESP"
-                                lootHl.FillColor = isMed and Color3.fromRGB(0, 255, 0) or (isAmmo and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 255, 0))
-                                lootHl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                                lootHl.FillTransparency = 0.4
-                                lootHl.Adornee = obj
-                                lootHl.Parent = obj
+                        if part and not part:FindFirstChild("RoyLootText") then
+                            local color = isMed and Color3.fromRGB(0, 255, 0) or (isAmmo and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 255, 0))
+                            local bill = Instance.new("BillboardGui")
+                            bill.Name = "RoyLootText"
+                            bill.Adornee = part
+                            bill.Size = UDim2.new(0, 100, 0, 30)
+                            bill.StudsOffset = Vector3.new(0, 2, 0)
+                            bill.AlwaysOnTop = true
+                            bill.Parent = part
 
-                                local bill = Instance.new("BillboardGui")
-                                bill.Name = "RoyLootText"
-                                bill.Adornee = part
-                                bill.Size = UDim2.new(0, 100, 0, 30)
-                                bill.StudsOffset = Vector3.new(0, 2, 0)
-                                bill.AlwaysOnTop = true
-                                bill.Parent = part
-
-                                local txt = Instance.new("TextLabel")
-                                txt.Size = UDim2.new(1, 0, 1, 0)
-                                txt.BackgroundTransparency = 1
-                                txt.Text = obj.Name
-                                txt.TextColor3 = lootHl.FillColor
-                                txt.TextStrokeTransparency = 0
-                                txt.TextSize = 13
-                                txt.Font = Enum.Font.GothamBold
-                                txt.Parent = bill
-                            end
-                            lootHl.Enabled = true
+                            local txt = Instance.new("TextLabel")
+                            txt.Size = UDim2.new(1, 0, 1, 0)
+                            txt.BackgroundTransparency = 1
+                            txt.Text = obj.Name
+                            txt.TextColor3 = color
+                            txt.TextStrokeTransparency = 0
+                            txt.TextSize = 13
+                            txt.Font = Enum.Font.GothamBold
+                            txt.Parent = bill
                         end
                     end
                 end
             end
         end
 
-        -- Auto Kit Médico Instantâneo (Sem delay)
+        -- Auto Kit Médico Instantâneo
         local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -577,7 +564,8 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                     end
                 end
             end
-if closestTarget then
+
+            if closestTarget then
                 if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
                 local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
                 Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
@@ -641,8 +629,7 @@ if closestTarget then
 end)
 
 Rayfield:Notify({
-    Title = "Royality Hub Ultimate V29",
-    Content = "Interface carregada e visível com sucesso!",
+    Title = "Royality Hub V30",
+    Content = "Menu aberto e configurações salvas na memória!",
     Duration = 4
 })
-            
