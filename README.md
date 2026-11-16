@@ -1,6 +1,28 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE V27 (COMPLETO + FILTROS DE LOOT + FIND OWNER + CONFIG SAVE)
+--// ROYALITY HUB | ULTIMATE V28 (FIX: INTERFACE NÃO APARECIA + COMPLETO)
 --// ==========================================
+
+-- Limpeza preventiva de instâncias e conexões antigas para forçar a interface a aparecer
+pcall(function()
+    if getgenv().RoyalityLoop then
+        getgenv().RoyalityLoop:Disconnect()
+        getgenv().RoyalityLoop = nil
+    end
+    if getgenv().RoyalityFOV then
+        getgenv().RoyalityFOV:Remove()
+        getgenv().RoyalityFOV = nil
+    end
+    for _, v in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        if v.Name:lower():find("rayfield") or v.Name:lower():find("royality") then
+            v:Destroy()
+        end
+    end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "RoyESP" or obj.Name == "RoyAntenna" or obj.Name == "RoyLootESP" or obj.Name == "RoyLootText" then
+            obj:Destroy()
+        end
+    end
+end)
 
 pcall(function()
     if syn and syn.queue_on_teleport then
@@ -13,7 +35,7 @@ pcall(function()
 end)
 
 local Success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+    return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
 end)
 
 if not Success or not Rayfield then
@@ -102,6 +124,7 @@ pcall(function()
         FOVCircle.NumSides = 32
         FOVCircle.Radius = Config.FOVRadius
         FOVCircle.Filled = false
+        getgenv().RoyalityFOV = FOVCircle
     end
 end)
 
@@ -276,7 +299,7 @@ T3:CreateToggle({
     Name = "Filtro: Mostrar Armas",
     CurrentValue = Config.LootWeapons,
     Flag = "LWEP",
-    Callback = function(v) Config.LootWEapons = v end
+    Callback = function(v) Config.LootWeapons = v end
 })
 
 T3:CreateToggle({
@@ -355,7 +378,6 @@ T4:CreateButton({
             if success and site and site.data then
                 for _, server in ipairs(site.data) do
                     if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                        -- Checa se o player está no servidor (via API de presença ou tokens se aplicável)
                         foundServer = server.id
                         break
                     end
@@ -411,9 +433,9 @@ local function isVisible(targetPart, targetCharacter)
     return true
 end
 
---// Loop Principal Otimizado
+--// Loop Principal Otimizado e Vinculado Globalmente
 local counter = 0
-RunService.RenderStepped:Connect(function(dt)
+getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         if not LP or not LP.Character then return end
         
@@ -591,7 +613,7 @@ RunService.RenderStepped:Connect(function(dt)
                 if ammoVal and ammoVal.Value <= 0 then
                     for _, tool in ipairs(backpack:GetChildren()) do
                         if tool:IsA("Tool") then
-                            char.Humanoid:EquipTool(tool)
+                            hum:EquipTool(tool)
                             break
                         end
                     end
@@ -637,18 +659,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub Ultimate",
-    Content = "Carregado com sucesso e configs salvas.",
+    Content = "Interface limpa, carregada e visível na tela.",
     Duration = 4
 })
-                            end
-                        end
-                    end
-                end
-            end
-
-            if closestTarget then
-                if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
-                local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
-                Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
-            else
-                if FOVCircle then FOV
