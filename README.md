@@ -268,24 +268,33 @@ local function isPlayerCharacter(inst)
 end
 
 local function resolveRealItemName(obj)
-    local attrName = obj:GetAttribute("ItemName") or obj:GetAttribute("DisplayName") or obj:GetAttribute("Name")
-    if type(attrName) == "string" and attrName ~= "" then
-        return attrName
-    end
-
-    for _, child in ipairs(obj:GetChildren()) do
-        if child:IsA("StringValue") and (child.Name:lower():find("name") or child.Name:lower():find("item")) and child.Value ~= "" then
-            return child.Value
+    local curr = obj
+    while curr and curr ~= workspace do
+        local attrName = curr:GetAttribute("ItemName") or curr:GetAttribute("DisplayName") or curr:GetAttribute("Name")
+        if type(attrName) == "string" and attrName ~= "" and not genericNames[attrName:lower()] then
+            return attrName
         end
-    end
 
-    local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if prompt then
-        if prompt.ObjectText and prompt.ObjectText ~= "" then
-            return prompt.ObjectText
-        elseif prompt.ActionText and prompt.ActionText ~= "" and not genericNames[prompt.ActionText:lower()] then
-            return prompt.ActionText
+        for _, child in ipairs(curr:GetChildren()) do
+            if child:IsA("StringValue") and (child.Name:lower():find("name") or child.Name:lower():find("item")) and child.Value ~= "" then
+                return child.Value
+            end
         end
+
+        local prompt = curr:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt then
+            if prompt.ObjectText and prompt.ObjectText ~= "" and not genericNames[prompt.ObjectText:lower()] then
+                return prompt.ObjectText
+            elseif prompt.ActionText and prompt.ActionText ~= "" and not genericNames[prompt.ActionText:lower()] then
+                return prompt.ActionText
+            end
+        end
+
+        if curr:IsA("Tool") then
+            return curr.Name
+        end
+
+        curr = curr.Parent
     end
 
     local cleanName = obj.Name
@@ -300,8 +309,8 @@ local function resolveRealItemName(obj)
 end
 
 local function classifyRealLoot(obj)
-    if not obj or not obj.Parent or isPlayerCharacter(obj) then return nil, nil, nil end
-    if obj:IsA("Terrain") or obj:IsA("Camera") or obj:IsA("Folder") then return nil, nil, nil end
+    if not obj or not obj.Parent or isPlayerCharacter(obj) then return nil, nil, nil, nil end
+    if obj:IsA("Terrain") or obj:IsA("Camera") or obj:IsA("Folder") then return nil, nil, nil, nil end
 
     local isRealItem = false
     local targetPart = nil
@@ -313,29 +322,38 @@ local function classifyRealLoot(obj)
         local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
         local parentFolder = obj.Parent and obj.Parent.Name:lower() or ""
         local inLootContainer = parentFolder:find("loot") or parentFolder:find("drop") or parentFolder:find("item") or parentFolder:find("pickup") or parentFolder:find("weapon") or parentFolder:find("gun")
-        if hasPrompt or inLootContainer then
+        if hasPrompt or inLootContainer or obj:IsA("Tool") then
             if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") and trackedLoot[obj.Parent] then
-                return nil, nil, nil
+                return nil, nil, nil, nil
             end
             targetPart = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
-            if targetPart and targetPart.Size.Magnitude < 25 then
+            if targetPart and targetPart.Size.Magnitude < 35 then
                 isRealItem = true
             end
         end
     end
 
-    if not isRealItem or not targetPart then return nil, nil, nil end
+    if not isRealItem or not targetPart then return nil, nil, nil, nil end
 
     local realName = resolveRealItemName(obj)
     local nameLower = realName:lower()
 
-    if nameLower:find("med") or nameLower:find("kit") or nameLower:find("heal") or nameLower:find("band") or nameLower:find("cura") or nameLower:find("vida") or nameLower:find("syringe") or nameLower:find("potion") then
-        return "Med", targetPart, realName
+    local category, color
+    if nameLower:find("med") or nameLower:find("kit") or nameLower:find("heal") or nameLower:find("band") or nameLower:find("cura") or nameLower:find("vida") or nameLower:find("syringe") or nameLower:find("potion") or nameLower:find("first") then
+        category = "Med"
+        color = Color3.fromRGB(0, 255, 120) -- Verde vibrante para kits medicos
     elseif nameLower:find("ammo") or nameLower:find("bullet") or nameLower:find("mag") or nameLower:find("shell") or nameLower:find("munic") or nameLower:find("cart") then
-        return "Ammo", targetPart, realName
+        category = "Ammo"
+        color = Color3.fromRGB(0, 200, 255) -- Azul ciano para municao
+    elseif nameLower:find("gun") or nameLower:find("weapon") or nameLower:find("rifle") or nameLower:find("pistol") or nameLower:find("shotgun") or nameLower:find("sniper") or nameLower:find("smg") or obj:IsA("Tool") then
+        category = "Weapon"
+        color = Color3.fromRGB(255, 180, 0) -- Laranja dourado para armas
     else
-        return "Weapon", targetPart, realName
+        category = "Other"
+        color = Color3.fromRGB(200, 100, 255) -- Roxo para outros itens gerais
     end
+
+    return category, targetPart, realName, color
 end
 
 local function clearLootVisuals()
@@ -348,7 +366,7 @@ end
 local function registerLootCandidate(obj)
     if not Config.LootESPEnabled then return end
     if trackedLoot[obj] then return end
-    local category, part, realName = classifyRealLoot(obj)
+    local category, part, realName, color = classifyRealLoot(obj)
     if not category or not part then return end
     if part:FindFirstChild("RoyLootText") then return end
 
@@ -358,11 +376,10 @@ local function registerLootCandidate(obj)
         return
     end
 
-    local color = category == "Med" and Color3.fromRGB(0, 255, 0) or (category == "Ammo" and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 255, 0))
     local bill = Instance.new("BillboardGui")
     bill.Name = "RoyLootText"
     bill.Adornee = part
-    bill.Size = UDim2.new(0, 140, 0, 28)
+    bill.Size = UDim2.new(0, 150, 0, 28)
     bill.StudsOffset = Vector3.new(0, 1.8, 0)
     bill.MaxDistance = 400
     bill.AlwaysOnTop = true
@@ -414,7 +431,7 @@ T3:CreateToggle({
 })
 
 T3:CreateToggle({
-    Name = "ESP Loot Real",
+    Name = "ESP Loot Real com Cores",
     CurrentValue = Config.LootESPEnabled,
     Flag = "LESP",
     Callback = function(v)
@@ -601,6 +618,7 @@ getgenv().RoyalityLoop = RunService.RenderStepped:Connect(function(dt)
                     local hl = char:FindFirstChild("RoyESP")
                     local antenna = char:FindFirstChild("RoyAntenna")
                     
+                    
                     if Config.ESPEnabled and char then
                         if not hl then
                             hl = Instance.new("Highlight")
@@ -782,6 +800,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub",
-    Content = "Carregado.",
+    Content = "Carregado com sucesso.",
     Duration = 4
 })
