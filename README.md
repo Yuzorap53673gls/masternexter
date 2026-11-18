@@ -609,28 +609,68 @@ T4:CreateToggle({
 T4:CreateButton({
     Name = "Find Owner (gabecriadomal)",
     Callback = function()
+        Rayfield:Notify({
+            Title = "Royality Hub",
+            Content = "Buscando o server de gabecriadomal...",
+            Duration = 3
+        })
         task.spawn(function()
+            local targetName = "gabecriadomal"
             local successId, targetUserId = pcall(function()
-                return Players:GetUserIdFromNameAsync("gabecriadomal")
-            end)
-            if not successId or not targetUserId then return end
-
-            local success, site = pcall(function()
-                return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+                return Players:GetUserIdFromNameAsync(targetName)
             end)
 
-            local foundServer = nil
-            if success and site and site.data then
-                for _, server in ipairs(site.data) do
-                    if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                        foundServer = server.id
-                        break
-                    end
-                end
+            if not successId or not targetUserId then
+                Rayfield:Notify({
+                    Title = "Erro",
+                    Content = "Usuario nao encontrado.",
+                    Duration = 4
+                })
+                return
             end
 
-            if foundServer then
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, foundServer, LP)
+            local foundServerId = nil
+            local cursor = ""
+            
+            repeat
+                local success, result = pcall(function()
+                    local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+                    if cursor ~= "" then
+                        url = url .. "&cursor=" .. cursor
+                    end
+                    return HttpService:JSONDecode(game:HttpGet(url))
+                end)
+
+                if not success or not result or not result.data then break end
+
+                for _, server in ipairs(result.data) do
+                    if server.id ~= game.JobId and server.playing > 0 then
+                        for _, playerObj in ipairs(server.players or {}) do
+                            if playerObj.id == targetUserId then
+                                foundServerId = server.id
+                                break
+                            end
+                        end
+                    end
+                    if foundServerId then break end
+                end
+
+                cursor = result.nextPageCursor or ""
+            until foundServerId or cursor == "" or cursor == nil
+
+            if foundServerId then
+                Rayfield:Notify({
+                    Title = "Encontrado!",
+                    Content = "Entrando no server de gabecriadomal...",
+                    Duration = 4
+                })
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, foundServerId, LP)
+            else
+                Rayfield:Notify({
+                    Title = "Aviso",
+                    Content = "gabecriadomal nao esta em server publico no momento.",
+                    Duration = 5
+                })
             end
         end)
     end
