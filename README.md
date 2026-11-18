@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE FINAL V13 (COMPLETO & CORRIGIDO)
+--// ROYALITY HUB | ULTIMATE FINAL V14 (COMPLETO & OTIMIZADO)
 --// ==========================================
 
 pcall(function()
@@ -64,12 +64,12 @@ getgenv().DefaultConfig = {
     AutoFireEnabled = false,
     TeamCheck = false,
     WallCheck = true,
-    MaxAimDistance = 250,
+    MaxAimDistance = 350,
     AimPart = "Head",
     FOVRadius = 400,
-    AimbotStrength = 15,
+    AimbotStrength = 18,
     RapidFireEnabled = false,
-    AutoSwitchEnabled = false,
+    AutoSwitchEnabled = true,
     DamageMultiplier = 3.0,
     FlyEnabled = false,
     FlySpeed = 60,
@@ -112,7 +112,7 @@ pcall(function()
 end)
 
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Final v13",
+    Name = "Royality Hub | Ultimate Final v14",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -126,7 +126,7 @@ local T4 = Window:CreateTab("Sistema e Owner", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "🎯 Aimbot Inteligente (Players e Bots)",
+    Name = "🎯 Aimbot Grudado na Cabeça (Players e Bots)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
@@ -815,7 +815,7 @@ local lastMedUse = 0
 local lastShotTime = 0
 local counter = 0
 
---// Loop principal integrado (Aimbot, Auto Fire, ESP, MedKit, Fly, Kill Aura)
+--// Loop principal integrado (Aimbot Ajustado Sem Passar do Alvo, Auto Fire, ESP, Auto-Switch Corrigido)
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         Cam = workspace.CurrentCamera
@@ -900,7 +900,7 @@ RunService.RenderStepped:Connect(function(dt)
                         local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
                         if onScreen and isVisible(part, targetChar) then
                             local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                            local effectiveDist = isCurrentLock and (dist * 0.65) or dist
+                            local effectiveDist = isCurrentLock and (dist * 0.5) or dist
                             if dist <= Config.FOVRadius and effectiveDist < shortestDist then
                                 shortestDist = effectiveDist
                                 screenDistToTarget = dist
@@ -934,8 +934,19 @@ RunService.RenderStepped:Connect(function(dt)
             if Config.AimbotEnabled then
                 if closestTarget then
                     if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
-                    local targetCF = CFrame.new(Cam.CFrame.Position, closestTarget.Position)
-                    Cam.CFrame = Cam.CFrame:Lerp(targetCF, math.clamp(Config.AimbotStrength * 0.15, 0.2, 1))
+                    
+                    -- Predição exata de movimento lateral, correndo ou pulando (Tracking Perfeito)
+                    local targetRoot = lockedChar:FindFirstChild("HumanoidRootPart") or closestTarget
+                    local targetVelocity = targetRoot.AssemblyLinearVelocity
+                    local horizontalVel = Vector3.new(targetVelocity.X, 0, targetVelocity.Z)
+                    local distToCam = (closestTarget.Position - Cam.CFrame.Position).Magnitude
+                    local predictionTime = math.clamp(distToCam / 750, 0.015, 0.08)
+                    local predictedPos = closestTarget.Position + (horizontalVel * predictionTime)
+
+                    local targetCF = CFrame.new(Cam.CFrame.Position, predictedPos)
+                    -- Suavização calibrada para colar na cabeça sem passar do ponto ou tremer
+                    local smoothFactor = math.clamp(Config.AimbotStrength * 0.12, 0.25, 0.95)
+                    Cam.CFrame = Cam.CFrame:Lerp(targetCF, smoothFactor)
                 else
                     if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
                 end
@@ -954,15 +965,30 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Auto-Switch Weapon
+        -- Troca de Arma Automática Corrigida (Detecta quando descarrega e troca na hora)
         if Config.AutoSwitchEnabled and char and backpack then
             local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
-                local ammoVal = currentTool:FindFirstChild("Ammo") or currentTool:FindFirstChild("Clip") or currentTool:FindFirstChild("Bullets")
-                if ammoVal and ammoVal.Value <= 0 then
+                local ammoVal = currentTool:FindFirstChild("Ammo") 
+                    or currentTool:FindFirstChild("Clip") 
+                    or currentTool:FindFirstChild("Bullets") 
+                    or currentTool:FindFirstChild("StoredAmmo") 
+                    or currentTool:FindFirstChild("Mag")
+                
+                local isOutOfAmmo = false
+                if ammoVal and (tonumber(ammoVal.Value) or 1) <= 0 then
+                    isOutOfAmmo = true
+                else
+                    local valNum = tonumber(currentTool:GetAttribute("Ammo") or currentTool:GetAttribute("Clip"))
+                    if valNum and valNum <= 0 then
+                        isOutOfAmmo = true
+                    end
+                end
+
+                if isOutOfAmmo then
                     for _, tool in ipairs(backpack:GetChildren()) do
-                        if tool:IsA("Tool") and not isMedTool(tool) then
-                            char.Humanoid:EquipTool(tool)
+                        if tool:IsA("Tool") and not isMedTool(tool) and tool ~= currentTool then
+                            hum:EquipTool(tool)
                             break
                         end
                     end
@@ -1020,6 +1046,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub Concluído!",
-    Content = "Versão Ultimate Final V13 Carregada com Sucesso.",
+    Content = "Versão Ultimate Final V14 Carregada com Sucesso.",
     Duration = 4
 })
