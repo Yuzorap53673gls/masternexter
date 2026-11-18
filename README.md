@@ -1,5 +1,5 @@
 --// ==========================================
---// ROYALITY HUB | ULTIMATE FINAL V14 (COMPLETO & OTIMIZADO)
+--// ROYALITY HUB | ULTIMATE FINAL V16 (DEFINITIVO & COMPLETO)
 --// ==========================================
 
 pcall(function()
@@ -59,7 +59,7 @@ getgenv().DefaultConfig = {
     LootWeapons = true,
     LootAmmo = true,
     LootMedKits = true,
-    AutoMedKit = false,
+    AutoMedKit = true,
     AimbotEnabled = true,
     AutoFireEnabled = false,
     TeamCheck = false,
@@ -67,7 +67,7 @@ getgenv().DefaultConfig = {
     MaxAimDistance = 350,
     AimPart = "Head",
     FOVRadius = 400,
-    AimbotStrength = 18,
+    AimbotStrength = 20,
     RapidFireEnabled = false,
     AutoSwitchEnabled = true,
     DamageMultiplier = 3.0,
@@ -112,7 +112,7 @@ pcall(function()
 end)
 
 local Window = Rayfield:CreateWindow({
-    Name = "Royality Hub | Ultimate Final v14",
+    Name = "Royality Hub | Ultimate Final v16",
     LoadingTitle = "Carregando Hub...",
     LoadingSubtitle = "Delta Executor",
     ConfigurationSaving = { Enabled = false },
@@ -126,7 +126,7 @@ local T4 = Window:CreateTab("Sistema e Owner", 4483345998)
 
 --// Aba Combate
 T1:CreateToggle({
-    Name = "🎯 Aimbot Grudado na Cabeça (Players e Bots)",
+    Name = "🎯 Aimbot Grudado na Cabeça (Liga ao Atirar)",
     CurrentValue = Config.AimbotEnabled,
     Flag = "AE",
     Callback = function(v)
@@ -206,7 +206,7 @@ T1:CreateToggle({
 })
 
 T1:CreateToggle({
-    Name = "💉 Auto Kit Médico",
+    Name = "💉 Auto Kit Médico (Vida <= 60 & Parado)",
     CurrentValue = Config.AutoMedKit,
     Flag = "AMK",
     Callback = function(v) Config.AutoMedKit = v end
@@ -437,7 +437,7 @@ local function trackVisual(inst)
     return inst
 end
 
---// Verificação rigorosa para ignorar mortos / abatidos no chão
+--// Verificação rigorosa de alvos vivos e em pé
 local function isTargetAliveAndStanding(targetChar, hum)
     if not targetChar or not targetChar.Parent or not hum then return false end
     if hum.Health <= 0 then return false end
@@ -466,6 +466,25 @@ local function isTargetAliveAndStanding(targetChar, hum)
 
     return true
 end
+
+--// Detector de clique/disparo para ativar o Aimbot apenas ao atirar
+local isFiringPressed = false
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 
+        or input.UserInputType == Enum.UserInputType.Touch 
+        or input.KeyCode == Enum.KeyCode.ButtonR2 then
+        isFiringPressed = true
+    end
+end)
+
+UIS.InputEnded:Connect(function(input, gpe)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 
+        or input.UserInputType == Enum.UserInputType.Touch 
+        or input.KeyCode == Enum.KeyCode.ButtonR2 then
+        isFiringPressed = false
+    end
+end)
 
 --// Sistema de Scanner de Bots e NPCs em segundo plano
 local botModels = {}
@@ -718,7 +737,7 @@ end
 local function isMedTool(tool)
     if not tool or not tool:IsA("Tool") then return false end
     local n = tool.Name:lower()
-    return n:find("med") or n:find("kit") or n:find("heal") or n:find("band") or n:find("cura") or n:find("vida") or n:find("syringe") or n:find("potion") or n:find("first") or n:find("medico")
+    return n:find("med") or n:find("kit") or n:find("heal") or n:find("band") or n:find("cura") or n:find("vida") or n:find("syringe") or n:find("potion") or n:find("first") or n:find("medico") or n:find("bandage") or n:find("armor")
 end
 
 local function triggerAutoFire(char)
@@ -815,7 +834,7 @@ local lastMedUse = 0
 local lastShotTime = 0
 local counter = 0
 
---// Loop principal integrado (Aimbot Ajustado Sem Passar do Alvo, Auto Fire, ESP, Auto-Switch Corrigido)
+--// Loop principal integrado (Kit Médico Vida <= 60 & Parado + Aimbot Ativado Só ao Atirar com Slide Tracking)
 RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         Cam = workspace.CurrentCamera
@@ -848,10 +867,12 @@ RunService.RenderStepped:Connect(function(dt)
         local char = LP.Character
         local backpack = LP:FindFirstChildOfClass("Backpack")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local rp = char and char:FindFirstChild("HumanoidRootPart")
         
-        -- Auto Kit Médico
-        if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
-            if (tick() - lastMedUse) >= 0.25 then
+        --// Auto Kit Médico: Dispara quando Vida <= 60 e o player está PARADO (sem velocidade de movimento)
+        if Config.AutoMedKit and hum and hum.Health > 0 and hum.Health <= 60 and rp then
+            local isStandingStill = rp.AssemblyLinearVelocity.Magnitude < 1.5
+            if isStandingStill and (tick() - lastMedUse) >= 0.5 then
                 local equipped = char:FindFirstChildOfClass("Tool")
                 local medTool = nil
 
@@ -865,12 +886,18 @@ RunService.RenderStepped:Connect(function(dt)
 
                 if medTool then
                     lastMedUse = tick()
-                    if medTool.Parent ~= char then hum:EquipTool(medTool) end
+                    if medTool.Parent ~= char then 
+                        pcall(function() hum:EquipTool(medTool) end)
+                        task.wait(0.05)
+                    end
                     pcall(function() medTool:Activate() end)
                     pcall(function() if mouse1click then mouse1click() end end)
                     pcall(function()
-                        local rem = medTool:FindFirstChildWhichIsA("RemoteEvent", true)
-                        if rem then rem:FireServer() end
+                        for _, rem in ipairs(medTool:GetDescendants()) do
+                            if rem:IsA("RemoteEvent") then
+                                rem:FireServer()
+                            end
+                        end
                     end)
                 end
             end
@@ -878,29 +905,31 @@ RunService.RenderStepped:Connect(function(dt)
 
         local lockedTarget = nil
         local screenDistToTarget = 9999
-        if Config.AimbotEnabled or Config.AutoFireEnabled then
+        local shouldAim = Config.AimbotEnabled and isFiringPressed
+
+        if shouldAim or Config.AutoFireEnabled then
             local closestTarget = nil
             local closestCharFound = nil
             local closestPlayerFound = nil
             local shortestDist = Config.FOVRadius
             local screenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
-            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+            local myRoot = rp
 
             local function evaluateTarget(targetChar, targetPlayer, isCurrentLock)
                 if not targetChar or not targetChar.Parent or targetChar == char or not myRoot then return end
                 local pHum = targetChar:FindFirstChildOfClass("Humanoid")
                 local part = getAimPartForChar(targetChar)
-                local rp = targetChar:FindFirstChild("HumanoidRootPart") or part
+                local targetRp = targetChar:FindFirstChild("HumanoidRootPart") or part
 
-                if isTargetAliveAndStanding(targetChar, pHum) and part and rp then
+                if isTargetAliveAndStanding(targetChar, pHum) and part and targetRp then
                     if Config.TeamCheck and targetPlayer and LP.Team and targetPlayer.Team == LP.Team then return end
 
-                    local worldDist = (rp.Position - myRoot.Position).Magnitude
+                    local worldDist = (targetRp.Position - myRoot.Position).Magnitude
                     if worldDist <= Config.MaxAimDistance then
                         local screenPos, onScreen = Cam:WorldToViewportPoint(part.Position)
                         if onScreen and isVisible(part, targetChar) then
                             local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                            local effectiveDist = isCurrentLock and (dist * 0.5) or dist
+                            local effectiveDist = isCurrentLock and (dist * 0.4) or dist
                             if dist <= Config.FOVRadius and effectiveDist < shortestDist then
                                 shortestDist = effectiveDist
                                 screenDistToTarget = dist
@@ -931,21 +960,31 @@ RunService.RenderStepped:Connect(function(dt)
             lockedPlayer = closestPlayerFound
             lockedTarget = closestTarget
 
-            if Config.AimbotEnabled then
+            --// Aimbot Grudado na Cabeça (Ativado SOMENTE ao atirar com Slide & Jump Tracking perfeito)
+            if shouldAim then
                 if closestTarget then
                     if FOVCircle then FOVCircle.Color = Color3.fromRGB(0, 255, 100) end
                     
-                    -- Predição exata de movimento lateral, correndo ou pulando (Tracking Perfeito)
                     local targetRoot = lockedChar:FindFirstChild("HumanoidRootPart") or closestTarget
                     local targetVelocity = targetRoot.AssemblyLinearVelocity
                     local horizontalVel = Vector3.new(targetVelocity.X, 0, targetVelocity.Z)
+                    
+                    -- Correção para deslizar (Slide) e pular: ajusta instantaneamente a altura do alvo sem soltar
+                    local targetHead = lockedChar:FindFirstChild("Head") or closestTarget
+                    local heightOffset = Vector3.new(0, 0, 0)
+                    if targetRoot and targetHead then
+                        local verticalDiff = targetHead.Position.Y - targetRoot.Position.Y
+                        if verticalDiff < 1.2 then -- Detecta estado de slide/agachado
+                            heightOffset = Vector3.new(0, -0.4, 0)
+                        end
+                    end
+
                     local distToCam = (closestTarget.Position - Cam.CFrame.Position).Magnitude
-                    local predictionTime = math.clamp(distToCam / 750, 0.015, 0.08)
-                    local predictedPos = closestTarget.Position + (horizontalVel * predictionTime)
+                    local predictionTime = math.clamp(distToCam / 800, 0.01, 0.06)
+                    local predictedPos = closestTarget.Position + heightOffset + (horizontalVel * predictionTime)
 
                     local targetCF = CFrame.new(Cam.CFrame.Position, predictedPos)
-                    -- Suavização calibrada para colar na cabeça sem passar do ponto ou tremer
-                    local smoothFactor = math.clamp(Config.AimbotStrength * 0.12, 0.25, 0.95)
+                    local smoothFactor = math.clamp(Config.AimbotStrength * 0.15, 0.4, 1)
                     Cam.CFrame = Cam.CFrame:Lerp(targetCF, smoothFactor)
                 else
                     if FOVCircle then FOVCircle.Color = Color3.fromRGB(255, 50, 50) end
@@ -965,7 +1004,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
 
-        -- Troca de Arma Automática Corrigida (Detecta quando descarrega e troca na hora)
+        -- Troca de Arma Automática
         if Config.AutoSwitchEnabled and char and backpack then
             local currentTool = char:FindFirstChildOfClass("Tool")
             if currentTool then
@@ -997,7 +1036,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         -- Voo Suave
-        local rp = char and char:FindFirstChild("HumanoidRootPart")
         if rp and hum and Config.FlyEnabled then
             hum.PlatformStand = true
             rp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -1046,6 +1084,6 @@ end)
 
 Rayfield:Notify({
     Title = "Royality Hub Concluído!",
-    Content = "Versão Ultimate Final V14 Carregada com Sucesso.",
+    Content = "Versão Ultimate Final V16 Carregada com Sucesso.",
     Duration = 4
 })
