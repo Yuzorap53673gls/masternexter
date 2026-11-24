@@ -1,4 +1,4 @@
---// REAPER AIM | v21  (PC + celular)
+--// REAPER AIM | v22  (PC + celular)
 local P=game:GetService("Players")
 local RS=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
@@ -8,18 +8,23 @@ local LP=P.LocalPlayer
 local U2=UDim2.new local UD=UDim.new local C=Color3.fromRGB
 local F=Enum.Font local EIT=Enum.UserInputType local KC=Enum.KeyCode
 
-local AC=C(255,66,96) local GR=C(38,199,122) local BG=C(26,20,24)
-local PN=C(20,15,19) local RW=C(34,27,32) local RV=C(43,34,40)
+local AC=C(255,66,96) local GR=C(38,199,122) local BG=C(24,19,23)
+local PN=C(18,14,18) local RW=C(33,26,31) local RV=C(42,33,39)
 local TX=C(238,233,237) local MU=C(146,136,145)
+local CV=C(255,72,96) local CB=C(150,110,255)
+local BV=C(255,176,60) local BB=C(110,150,255)
 
 local CFG={Aimbot=false,ToggleMode=false,TeamCheck=false,WallCheck=true,
 Prediction=false,AutoFire=false,Mode="Camera",FOV=140,Smooth=100,
+TargetPart="Head",MaxDist=500,Scale=100,
 ESP=false,Antenna=false,LootESP=false,NoFog=false,Fullbright=false,
 AntiLag=false,Fly=false,FlySpeed=60,WalkSpeed=16,JumpPower=50,
 AutoMed=false,MedAt=60}
 
 local ST={firing=false,fireUntil=0,flyUp=false,flyDown=false,lock=nil,
 esp={},loot={},bots={},lastMed=0}
+
+local tGui,aimBtn,fireBtn,upBtn,downBtn
 
 local function mk(c,p,t)
   local o=Instance.new(c)
@@ -45,29 +50,28 @@ end
 if not gui.Parent then gui:Destroy() toast("Reaper Aim","Executor bloqueou a interface.",6) return end
 
 local VPS=workspace.CurrentCamera.ViewportSize
-local WW=math.min(520,VPS.X-24)
-local WH=math.min(432,VPS.Y-120)
-local SW=WW<420 and 118 or 148
+local WW=math.min(540,VPS.X-24)
+local WH=math.min(450,VPS.Y-120)
+local SW=WW<430 and 120 or 150
 
 local win=mk("Frame",gui,{Size=U2(0,WW,0,WH),
 Position=U2(0,math.max(8,(VPS.X-WW)/2),0,70),BackgroundColor3=BG,
 BorderSizePixel=0,Active=true,ClipsDescendants=true})
 mk("UICorner",win,{CornerRadius=UD(0,10)})
 mk("UIStroke",win,{Color=C(52,40,48),Thickness=1})
+local uisc=mk("UIScale",win,{Scale=1})
 
 local bar=mk("Frame",win,{Size=U2(1,0,0,40),BackgroundColor3=PN,BorderSizePixel=0,Active=true})
 mk("UICorner",bar,{CornerRadius=UD(0,10)})
 mk("Frame",bar,{Size=U2(1,0,0,14),Position=U2(0,0,1,-14),BackgroundColor3=PN,BorderSizePixel=0})
-
 local dot=mk("Frame",bar,{Size=U2(0,9,0,9),Position=U2(0,14,.5,-4.5),
 BackgroundColor3=AC,BorderSizePixel=0})
 mk("UICorner",dot,{CornerRadius=UD(1,0)})
-
-mk("TextLabel",bar,{Size=U2(0,200,1,0),Position=U2(0,30,0,0),
+mk("TextLabel",bar,{Size=U2(0,220,1,0),Position=U2(0,30,0,0),
 BackgroundTransparency=1,Text="Reaper Aim",Font=F.GothamSemibold,TextSize=13,
 TextColor3=TX,TextXAlignment=Enum.TextXAlignment.Left})
 
-local function bb(txt,x)
+local function barBtn(txt,x)
   local b=mk("TextButton",bar,{Size=U2(0,28,0,26),Position=U2(1,x,.5,-13),
   BackgroundTransparency=1,BorderSizePixel=0,Text=txt,Font=F.GothamBold,
   TextSize=13,TextColor3=MU,AutoButtonColor=false,ZIndex=4})
@@ -76,30 +80,60 @@ local function bb(txt,x)
   b.MouseLeave:Connect(function() b.TextColor3=MU b.BackgroundTransparency=1 end)
   return b
 end
-local bMin=bb("-",-96) local bMax=bb("o",-64) local bClose=bb("X",-32)
+local bMin=barBtn("-",-96) local bMax=barBtn("o",-64) local bClose=barBtn("X",-32)
 
+--// BOTAO REDONDO (modo oculto)
+local mini=mk("TextButton",gui,{Size=U2(0,60,0,60),Position=U2(0,18,0,110),
+BackgroundColor3=AC,BorderSizePixel=0,Text="",AutoButtonColor=false,
+Visible=false,ZIndex=20})
+mk("UICorner",mini,{CornerRadius=UD(1,0)})
+mk("UIStroke",mini,{Color=C(255,130,150),Thickness=2})
+mk("TextLabel",mini,{Size=U2(1,0,0,18),Position=U2(0,0,0,14),
+BackgroundTransparency=1,Text="R",Font=F.GothamBold,TextSize=20,TextColor3=C(255,255,255)})
+mk("TextLabel",mini,{Size=U2(1,0,0,12),Position=U2(0,0,0,34),
+BackgroundTransparency=1,Text="Reaper",Font=F.GothamBold,TextSize=8,
+TextColor3=C(255,235,240)})
+
+local function setMini(on)
+  win.Visible=not on
+  mini.Visible=on
+end
+
+--// ARRASTAR
 local drag,dS,dP=false,nil,nil
+local mDrag,mS,mP,mM=false,nil,nil,0
+local function startDrag(i,isMini)
+  if isMini then mDrag=true mS=i.Position mP=mini.Position mM=0
+  else drag=true dS=i.Position dP=win.Position end
+  i.Changed:Connect(function()
+    if i.UserInputState==Enum.UserInputState.End then
+      if isMini then
+        mDrag=false
+        if mM<8 then setMini(false) end
+      else
+        drag=false
+      end
+    end
+  end)
+end
 bar.InputBegan:Connect(function(i)
-  if i.UserInputType==EIT.MouseButton1 or i.UserInputType==EIT.Touch then
-    drag=true dS=i.Position dP=win.Position
-    i.Changed:Connect(function()
-      if i.UserInputState==Enum.UserInputState.End then drag=false end
-    end)
-  end
+  if i.UserInputType==EIT.MouseButton1 or i.UserInputType==EIT.Touch then startDrag(i,false) end
+end)
+mini.InputBegan:Connect(function(i)
+  if i.UserInputType==EIT.MouseButton1 or i.UserInputType==EIT.Touch then startDrag(i,true) end
 end)
 UIS.InputChanged:Connect(function(i)
-  if not drag then return end
-  if i.UserInputType==EIT.MouseMovement or i.UserInputType==EIT.Touch then
-    local d=i.Position-dS
-    win.Position=U2(dP.X.Scale,dP.X.Offset+d.X,dP.Y.Scale,dP.Y.Offset+d.Y)
+  if i.UserInputType~=EIT.MouseMovement and i.UserInputType~=EIT.Touch then return end
+  if drag and dS then
+    local o=i.Position-dS
+    win.Position=U2(dP.X.Scale,dP.X.Offset+o.X,dP.Y.Scale,dP.Y.Offset+o.Y)
+  elseif mDrag and mS then
+    local o=i.Position-mS
+    mM=math.max(mM,o.Magnitude)
+    mini.Position=U2(mP.X.Scale,mP.X.Offset+o.X,mP.Y.Scale,mP.Y.Offset+o.Y)
   end
 end)
 
-local col=false
-bMin.MouseButton1Click:Connect(function()
-  col=not col
-  win.Size=col and U2(0,WW,0,40) or U2(0,WW,0,WH)
-end)
 local zoom=false
 bMax.MouseButton1Click:Connect(function()
   zoom=not zoom
@@ -109,9 +143,6 @@ bMax.MouseButton1Click:Connect(function()
     win.Position=U2(0,math.max(8,(VPS.X-WW)/2),0,70) win.Size=U2(0,WW,0,WH)
   end
 end)
-bClose.MouseButton1Click:Connect(function()
-  gui:Destroy() toast("Reaper Aim","Fechado. Execute de novo.",3)
-end)
 
 local side=mk("Frame",win,{Size=U2(0,SW,1,-40),Position=U2(0,0,0,40),
 BackgroundColor3=PN,BorderSizePixel=0})
@@ -120,7 +151,7 @@ BackgroundColor3=BG,BorderSizePixel=0})
 
 local pages,navs={},{}
 local NAV={{"Home","#"},{"Visuals","*"},{"Aimbot","@"},{"FPS","%"},
-{"Character","+"},{"Config","="},{"Creditos","i"}}
+{"Character","+"},{"Config","="},{"Novidades","!"},{"Creditos","i"}}
 
 local ord=0
 local function newPage(k)
@@ -147,10 +178,10 @@ local function show(k)
 end
 
 for i,it in ipairs(NAV) do
-  local b=mk("TextButton",side,{Size=U2(1,-16,0,34),Position=U2(0,8,0,8+(i-1)*38),
+  local b=mk("TextButton",side,{Size=U2(1,-14,0,32),Position=U2(0,7,0,8+(i-1)*35),
   BackgroundColor3=PN,BorderSizePixel=0,Text="",AutoButtonColor=false})
   mk("UICorner",b,{CornerRadius=UD(0,7)})
-  local bar0=mk("Frame",b,{Size=U2(0,3,0,16),Position=U2(0,-8,.5,-8),
+  local bar0=mk("Frame",b,{Size=U2(0,3,0,16),Position=U2(0,-7,.5,-8),
   BackgroundColor3=AC,BorderSizePixel=0,Visible=false})
   mk("UICorner",bar0,{CornerRadius=UD(1,0)})
   local gl=mk("TextLabel",b,{Size=U2(0,18,1,0),Position=U2(0,10,0,0),
@@ -163,7 +194,7 @@ for i,it in ipairs(NAV) do
   newPage(it[1])
 end
 
-local chip=mk("Frame",side,{Size=U2(1,-16,0,34),Position=U2(0,8,1,-42),
+local chip=mk("Frame",side,{Size=U2(1,-14,0,34),Position=U2(0,7,1,-42),
 BackgroundTransparency=1})
 local av=mk("Frame",chip,{Size=U2(0,24,0,24),Position=U2(0,4,.5,-12),
 BackgroundColor3=AC,BorderSizePixel=0})
@@ -225,7 +256,7 @@ end
 local function step(par,t,k,st,mn,mx,cb)
   local r=row(par,34)
   rlab(r,t)
-  local val=mk("TextLabel",r,{Size=U2(0,40,0,20),Position=U2(1,-100,.5,-10),
+  local val=mk("TextLabel",r,{Size=U2(0,46,0,20),Position=U2(1,-100,.5,-10),
   BackgroundTransparency=1,Text=tostring(CFG[k]),Font=F.GothamBold,
   TextSize=12,TextColor3=AC})
   local function sb(txt,x,dir)
@@ -279,7 +310,22 @@ local function btn(par,t,fn)
   end)
 end
 
+local function note(par,t,h)
+  local l=mk("TextLabel",par,{Size=U2(1,0,0,h),BackgroundColor3=RW,
+  BorderSizePixel=0,Text=t,Font=F.Gotham,TextSize=11,TextColor3=MU,
+  TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,
+  TextYAlignment=Enum.TextYAlignment.Top,LayoutOrder=ord+1})
+  mk("UICorner",l,{CornerRadius=UD(0,7)})
+  mk("UIPadding",l,{PaddingLeft=UD(0,10),PaddingTop=UD(0,8)})
+  ord=ord+1
+  return l
+end
+
 --// ESP
+local function headOf(ch)
+  return ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
+end
+
 local function clearESP(ch)
   local d=ST.esp[ch]
   if not d then return end
@@ -291,28 +337,36 @@ local function clearAllESP()
   for c in pairs(ST.esp) do clearESP(c) end
 end
 
-local function aimPart(ch)
-  return ch:FindFirstChild("Head") or ch:FindFirstChild("UpperTorso")
-    or ch:FindFirstChild("Torso") or ch:FindFirstChild("HumanoidRootPart")
+local function freeSight(ch)
+  local cam=workspace.CurrentCamera
+  local pt=headOf(ch)
+  if not cam or not pt then return true end
+  local rp=RaycastParams.new()
+  rp.FilterType=Enum.RaycastFilterType.Exclude
+  local ig={cam,ch}
+  if LP.Character then table.insert(ig,LP.Character) end
+  rp.FilterDescendantsInstances=ig rp.IgnoreWater=true
+  local o=cam.CFrame.Position
+  return workspace:Raycast(o,pt.Position-o,rp)==nil
 end
 
 local function applyESP(ch)
   if not ch or ch==LP.Character or ST.esp[ch] then return end
   local hum=ch:FindFirstChildOfClass("Humanoid")
-  local hp=aimPart(ch)
-  if not hum or not hp or hum.Health<=0 then return end
-  local isP=P:GetPlayerFromCharacter(ch)~=nil
-  local col=isP and C(255,72,96) or C(255,176,60)
+  if not hum or hum.Health<=0 then return end
+  local pl=P:GetPlayerFromCharacter(ch)
+  local isP=pl~=nil
+  local nm=isP and pl.Name or ch.Name
+  local col=isP and CV or BV
   local hl=mk("Highlight",ch,{Name="ReaperHL",Adornee=ch,FillColor=col,
-  FillTransparency=.6,OutlineColor=C(255,255,255),OutlineTransparency=.3})
-  local bb2=mk("BillboardGui",ch,{Name="ReaperBB",Adornee=hp,
-  Size=U2(0,170,0,34),StudsOffset=Vector3.new(0,2.3,0),AlwaysOnTop=true})
+  FillTransparency=.62,OutlineColor=C(255,255,255),OutlineTransparency=.3})
+  local bb2=mk("BillboardGui",ch,{Name="ReaperBB",Adornee=ch,
+  Size=U2(0,190,0,34),StudsOffset=Vector3.new(0,3,0),AlwaysOnTop=true})
   local lb=mk("TextLabel",bb2,{Size=U2(1,0,1,0),BackgroundTransparency=1,
-  Text=isP and ch.Name or "BOT",Font=F.GothamBold,TextSize=12,
-  TextColor3=col,TextStrokeTransparency=.5})
-  local sp=mk("Frame",bb2,{Size=U2(0,3,0,44),Position=U2(.5,-1.5,0,-44),
+  Text=nm,Font=F.GothamBold,TextSize=12,TextColor3=col,TextStrokeTransparency=.5})
+  local sp=mk("Frame",bb2,{Size=U2(0,3,0,42),Position=U2(.5,-1.5,0,-42),
   BackgroundColor3=col,BorderSizePixel=0,Visible=CFG.Antenna})
-  ST.esp[ch]={hl=hl,bb=bb2,label=lb,spike=sp,hum=hum,name=isP and ch.Name or "BOT"}
+  ST.esp[ch]={hl=hl,bb=bb2,label=lb,spike=sp,isP=isP,pname=nm}
 end
 
 --// LOOT
@@ -354,6 +408,15 @@ local function scanLoot()
 end
 
 --// MIRA
+local function aimPart(ch)
+  if CFG.TargetPart=="Body" then
+    return ch:FindFirstChild("UpperTorso") or ch:FindFirstChild("Torso")
+      or ch:FindFirstChild("HumanoidRootPart")
+  end
+  return ch:FindFirstChild("Head") or ch:FindFirstChild("UpperTorso")
+    or ch:FindFirstChild("HumanoidRootPart")
+end
+
 local function isMate(ch)
   if not CFG.TeamCheck then return false end
   local pl=P:GetPlayerFromCharacter(ch)
@@ -367,13 +430,11 @@ local function canSee(ch,pt)
   if not cam then return false end
   local rp=RaycastParams.new()
   rp.FilterType=Enum.RaycastFilterType.Exclude
-  local ig={cam}
+  local ig={cam,ch}
   if LP.Character then table.insert(ig,LP.Character) end
   rp.FilterDescendantsInstances=ig rp.IgnoreWater=true
   local o=cam.CFrame.Position
-  local r=workspace:Raycast(o,pt.Position-o,rp)
-  if not r then return true end
-  return r.Instance:IsDescendantOf(ch)
+  return workspace:Raycast(o,pt.Position-o,rp)==nil
 end
 
 local function sdist(pt)
@@ -386,13 +447,17 @@ local function sdist(pt)
 end
 
 local function pick()
+  local cam=workspace.CurrentCamera
+  if not cam then return nil end
+  local eye=cam.CFrame.Position
   local best=nil
   local function go(ch)
     if not ch or ch==LP.Character or isMate(ch) then return end
     local h=ch:FindFirstChildOfClass("Humanoid")
     if not h or h.Health<=0 then return end
     local pt=aimPart(ch)
-    if not pt then return end
+    if not pt or not pt.Parent then return end
+    if (pt.Position-eye).Magnitude>CFG.MaxDist then return end
     local d=sdist(pt)
     if d>CFG.FOV then return end
     if not canSee(ch,pt) then return end
@@ -400,33 +465,9 @@ local function pick()
   end
   for _,p in ipairs(P:GetPlayers()) do if p~=LP then go(p.Character) end end
   for _,b in ipairs(ST.bots) do
-    if b.char.Parent and b.part.Parent then
-      local d=sdist(b.part)
-      if d<=CFG.FOV and canSee(b.char,b.part) then
-        if not best or d<best.d then best={char=b.char,part=b.part,d=d} end
-      end
-    end
+    if b.char.Parent then go(b.char) end
   end
   return best
-end
-
-local function alive(t)
-  if not t then return false end
-  local c=t.char
-  if not c or not c.Parent then return false end
-  local h=c:FindFirstChildOfClass("Humanoid")
-  if not h or h.Health<=0 then return false end
-  return t.part and t.part.Parent~=nil
-end
-
-local function getTarget()
-  if alive(ST.lock) then
-    if sdist(ST.lock.part)<=CFG.FOV+30 and canSee(ST.lock.char,ST.lock.part) then
-      return ST.lock
-    end
-  end
-  ST.lock=pick()
-  return ST.lock
 end
 
 local function aimPos(t)
@@ -460,18 +501,6 @@ local function mouseTo(p)
     pcall(mousemoverel,(v.X-ce.X)/sx,(v.Y-ce.Y)/sx)
   elseif mousemoveabs then
     pcall(mousemoveabs,v.X,v.Y)
-  end
-end
-
-local function applyAim(t)
-  local p=aimPos(t)
-  if CFG.Mode=="Mouse" then
-    mouseTo(p)
-  elseif CFG.Mode=="Silent" then
-    local cam=workspace.CurrentCamera
-    if cam then cam.CFrame=CFrame.new(cam.CFrame.Position,p) end
-  else
-    camTo(p)
   end
 end
 
@@ -516,7 +545,6 @@ local function setFog(on)
     end
   end)
 end
-
 local function setBright(on)
   pcall(function()
     if on then
@@ -528,7 +556,6 @@ local function setBright(on)
     end
   end)
 end
-
 local function setLag(on)
   pcall(function()
     L.EnvironmentSpecularScale=on and 0 or ligS[4]
@@ -548,6 +575,28 @@ local function setLag(on)
   end)
 end
 
+--// FECHAR
+local function shutdown()
+  pcall(function() RS:UnbindFromRenderStep("ReaperAim") end)
+  CFG.Aimbot=false CFG.ESP=false CFG.Fly=false CFG.LootESP=false
+  CFG.AutoFire=false CFG.AutoMed=false
+  pcall(stopFly) pcall(clearAllESP) pcall(clearLoot)
+  pcall(setFog,false) pcall(setBright,false) pcall(setLag,false)
+  pcall(function()
+    local ch=LP.Character
+    local h=ch and ch:FindFirstChildOfClass("Humanoid")
+    if h then h.WalkSpeed=16 if h.UseJumpPower then h.JumpPower=50 end end
+  end)
+  if tGui then pcall(function() tGui:Destroy() end) end
+  gui:Destroy()
+end
+
+bClose.MouseButton1Click:Connect(function()
+  shutdown()
+  toast("Reaper Aim","Fechado e desativado.",3)
+end)
+bMin.MouseButton1Click:Connect(function() setMini(true) end)
+
 --// CIRCULO
 local circ=mk("Frame",gui,{Name="ReaperFOV",
 Size=U2(0,CFG.FOV*2,0,CFG.FOV*2),Position=U2(.5,-CFG.FOV,.5,-CFG.FOV),
@@ -566,6 +615,7 @@ local homeName=mk("TextLabel",home,{Size=U2(1,0,0,34),BackgroundColor3=RW,
 BorderSizePixel=0,Text="",Font=F.GothamBold,TextSize=12,TextColor3=TX,
 LayoutOrder=ord+1})
 mk("UICorner",homeName,{CornerRadius=UD(0,7)})
+ord=ord+1
 
 sect(home,"Atalhos")
 tog(home,"Enable Aimbot","Aimbot",function(v) circ.Visible=v end)
@@ -577,12 +627,8 @@ end)
 tog(home,"Kit medico automatico","AutoMed")
 
 sect(home,"Status")
-local stLbl=mk("TextLabel",home,{Size=U2(1,0,0,62),BackgroundColor3=RW,
-BorderSizePixel=0,Text="",Font=F.Code,TextSize=11,TextColor3=MU,
-TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,
-TextWrapped=true,LayoutOrder=ord+1})
-mk("UICorner",stLbl,{CornerRadius=UD(0,7)})
-mk("UIPadding",stLbl,{PaddingLeft=UD(0,10),PaddingTop=UD(0,8)})
+local stLbl=note(home,"",66)
+stLbl.Font=F.Code
 
 local vis=pages.Visuals
 sect(vis,"ESP")
@@ -591,6 +637,7 @@ tog(vis,"Antena","Antenna")
 tog(vis,"ESP de Loot","LootESP",function(v)
   if not v then clearLoot() else task.spawn(scanLoot) end
 end)
+note(vis,"Vermelho = visivel   Roxo = atras de objeto\nLaranja = bot visivel   Azul = bot atras",44)
 sect(vis,"Ambiente")
 tog(vis,"Remover neblina","NoFog",function(v) setFog(v) end)
 tog(vis,"Fullbright","Fullbright",function(v) setBright(v) end)
@@ -606,20 +653,23 @@ tog(ap,"Visible Check (Wall Check)","WallCheck")
 tog(ap,"Prediction","Prediction")
 tog(ap,"Atirar automatico","AutoFire")
 
-sect(ap,"Modo")
+sect(ap,"Onde mirar")
+radio(ap,"TargetPart",{{t="Cabeca",v="Head"},{t="Corpo",v="Body"}})
+
+sect(ap,"Modo de mira")
 radio(ap,"Mode",{{t="Camera",v="Camera"},{t="Mouse",v="Mouse"},
 {t="Silent",v="Silent"}})
 
 sect(ap,"Ajustes")
 step(ap,"FOV","FOV",10,40,500,reCircle)
 step(ap,"Velocidade da mira","Smooth",10,20,100)
+step(ap,"Distancia maxima (studs)","MaxDist",50,50,3000)
 
 local fp=pages.FPS
 sect(fp,"Desempenho")
 tog(fp,"Anti-Lag","AntiLag",function(v) setLag(v) end)
 tog(fp,"Remover neblina","NoFog",function(v) setFog(v) end)
 tog(fp,"Fullbright","Fullbright",function(v) setBright(v) end)
-step(fp,"FOV da mira","FOV",10,40,500,reCircle)
 
 local cr=pages.Character
 sect(cr,"Movimento")
@@ -628,9 +678,8 @@ tog(cr,"Voar","Fly",function(v)
   if upBtn then upBtn.Visible=v downBtn.Visible=v end
 end)
 step(cr,"Velocidade do voo","FlySpeed",10,20,300)
-step(cr,"WalkSpeed","WalkSpeed",2,8,200,applyChar)
+step(cr,"Speed (WalkSpeed)","WalkSpeed",2,8,300,applyChar)
 step(cr,"JumpPower","JumpPower",5,20,300,applyChar)
-
 sect(cr,"Vida")
 tog(cr,"Kit medico automatico","AutoMed",function(v)
   if v then ST.lastMed=0 end
@@ -638,6 +687,14 @@ end)
 step(cr,"Curar abaixo de","MedAt",5,10,95)
 
 local cg=pages.Config
+sect(cg,"Interface")
+step(cg,"Tamanho da interface %","Scale",10,60,180,function()
+  uisc.Scale=CFG.Scale/100
+end)
+btn(cg,"Restaurar tamanho",function()
+  CFG.Scale=100 uisc.Scale=1
+  toast("Reaper Aim","Tamanho restaurado (100%).",3)
+end)
 sect(cg,"Servidor")
 btn(cg,"Copiar JobId",function()
   if setclipboard then setclipboard(game.JobId) end
@@ -646,32 +703,57 @@ end)
 btn(cg,"Reconectar neste servidor",function()
   TPS:TeleportToPlaceInstance(game.PlaceId,game.JobId,LP)
 end)
-
 sect(cg,"Geral")
-btn(cg,"Resetar tudo",function()
+btn(cg,"Resetar todas as funcoes",function()
   for k,v in pairs(CFG) do if type(v)=="boolean" then CFG[k]=false end end
   CFG.FOV=140 CFG.Smooth=100 CFG.MedAt=60 CFG.FlySpeed=60
-  CFG.WalkSpeed=16 CFG.JumpPower=50
+  CFG.WalkSpeed=16 CFG.JumpPower=50 CFG.MaxDist=500 CFG.TargetPart="Head"
   clearAllESP() clearLoot() stopFly() circ.Visible=false reCircle()
   if upBtn then upBtn.Visible=false downBtn.Visible=false end
   setLag(false) setFog(false) setBright(false) applyChar()
   toast("Reaper Aim","Tudo resetado.",3)
 end)
 
+local nv=pages.Novidades
+sect(nv,"v22 - atual")
+note(nv,[[
+* Mira so trava quando voce atira (clique ou segure).
+* Ignora jogador atras de parede e fora do FOV.
+* Para de mirar assim que o alvo morre.
+* Escolha do ponto do tiro: cabeca ou corpo.
+* Distancia maxima configuravel.
+* ESP: vermelho visivel / roxo atras de objeto.
+* ESP mostra o nome real de cada jogador.
+* ESP acompanha jogador de longe (streaming).
+* Nome e vida atualizados em tempo real.
+* Botao redondo "Reaper" para esconder a janela.
+* Tamanho da interface ajustavel (60% a 180%).
+* Fechar o script desliga tudo e restaura o jogo.
+* Speed e JumpPower na aba Character.
+]],300)
+
+sect(nv,"v21")
+note(nv,[[
+* Interface Reaper Aim com menu lateral.
+* Aimbot Camera / Mouse / Silent.
+* Kit medico, voo, loot ESP e anti-lag.
+]],88)
+
 local cd=pages.Creditos
 sect(cd,"Sobre")
-local ab=mk("TextLabel",cd,{Size=U2(1,0,0,130),BackgroundColor3=RW,
-BorderSizePixel=0,Text="Reaper Aim  v21\n\nAimbot Camera / Mouse / Silent,\nESP, loot, voo, kit medico e otimizacao.\n\nPC: segure (ou clique) o botao de atirar.\nCelular: toque no botao de atirar,\nuse AIM para segurar e FIRE para disparar.",
-Font=F.Gotham,TextSize=11,TextColor3=MU,TextWrapped=true,
-TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,
-LayoutOrder=ord+1})
-mk("UICorner",ab,{CornerRadius=UD(0,7)})
-mk("UIPadding",ab,{PaddingLeft=UD(0,10),PaddingTop=UD(0,8)})
+note(cd,[[
+Reaper Aim v22
+
+PC: clique ou segure o botao esquerdo.
+Celular: toque em atirar, use AIM para
+segurar e FIRE para disparar.
+
+Tecla de atalho: nenhuma.
+]],120)
 
 show("Home")
 
 --// TOQUE
-local tGui,aimBtn,fireBtn,upBtn,downBtn
 if UIS.TouchEnabled then
   local root=nil
   pcall(function() root=(gethui and gethui()) or game:GetService("CoreGui") end)
@@ -703,9 +785,7 @@ if UIS.TouchEnabled then
       if not CFG.ToggleMode then ST.firing=false pr(aimBtn,false) end
     end)
     fireBtn.MouseButton1Down:Connect(function()
-      ST.fireUntil=os.clock()+1
-      pr(fireBtn,true)
-      fireWeapon()
+      ST.fireUntil=os.clock()+1 pr(fireBtn,true) fireWeapon()
     end)
     fireBtn.MouseButton1Up:Connect(function() pr(fireBtn,false) end)
     upBtn.MouseButton1Down:Connect(function() ST.flyUp=true pr(upBtn,true) end)
@@ -717,15 +797,13 @@ end
 
 --// ENTRADA
 local function overPanel()
-  if not gui.Parent then return false end
+  if not gui.Parent or not win.Visible then return false end
   local m=UIS:GetMouseLocation()
   local p=win.AbsolutePosition
   local s=win.AbsoluteSize
   return m.X>=p.X and m.X<=p.X+s.X and m.Y>=p.Y and m.Y<=p.Y+s.Y
 end
-
 local function pulse() ST.fireUntil=os.clock()+0.5 end
-
 local function holding()
   if os.clock()<(ST.fireUntil or 0) then return true end
   if ST.firing then return true end
@@ -745,7 +823,6 @@ UIS.InputBegan:Connect(function(i)
     if i.Position.X>v.X*0.55 and i.Position.Y>v.Y*0.35 then pulse() end
   end
 end)
-
 UIS.InputEnded:Connect(function(i)
   if i.UserInputType==EIT.MouseButton1 or i.KeyCode==KC.ButtonR2 then
     if not CFG.ToggleMode then ST.firing=false end
@@ -760,8 +837,7 @@ local function refreshBots()
     if d:IsA("Humanoid") and d.Health>0 then
       local c=d.Parent
       if c and not P:GetPlayerFromCharacter(c) then
-        local pt=aimPart(c)
-        if pt then table.insert(out,{char=c,part=pt}) end
+        table.insert(out,{char=c,part=headOf(c)})
       end
     end
   end
@@ -776,21 +852,34 @@ task.spawn(function()
 end)
 
 task.spawn(function()
+  local cam=workspace.CurrentCamera
   while gui.Parent do
-    task.wait(0.2)
+    task.wait(0.15)
+    cam=workspace.CurrentCamera
     if CFG.ESP then
       for _,p in ipairs(P:GetPlayers()) do
         if p~=LP then applyESP(p.Character) end
       end
       for _,b in ipairs(ST.bots) do applyESP(b.char) end
       for ch,d in pairs(ST.esp) do
-        if not ch.Parent then
+        local h=ch:FindFirstChildOfClass("Humanoid")
+        if not ch.Parent or not h or h.Health<=0 then
           clearESP(ch)
         else
-          if d.hum and d.label then
-            d.label.Text=d.name.."  "..math.floor(d.hum.Health).."hp"
+          local ok,dis=pcall(function()
+            return math.floor((cam.CFrame.Position-ch:GetPivot().Position).Magnitude)
+          end)
+          local vis=true
+          if ok then vis=freeSight(ch) end
+          local col=d.isP and (vis and CV or CB) or (vis and BV or BB)
+          d.hl.FillColor=col
+          d.label.TextColor3=col
+          d.label.Text=(d.isP and d.pname or ("[BOT] "..d.pname))
+            .."  "..math.floor(h.Health).."hp  "..(ok and dis or 0).."m"
+          if d.spike then
+            d.spike.Visible=CFG.Antenna
+            d.spike.BackgroundColor3=col
           end
-          if d.spike then d.spike.Visible=CFG.Antenna end
         end
       end
     elseif next(ST.esp) then
@@ -813,7 +902,6 @@ local function isMed(t)
     or n:find("heal",1,true) or n:find("band",1,true)
     or n:find("curar",1,true) or n:find("vida",1,true)
 end
-
 local function findMed(ch)
   for _,t in ipairs(ch:GetChildren()) do if isMed(t) then return t end end
   local bp=LP:FindFirstChildOfClass("Backpack")
@@ -857,10 +945,11 @@ task.spawn(function()
       local ch=LP.Character
       local h=ch and ch:FindFirstChildOfClass("Humanoid")
       homeName.Text="  "..LP.Name..(h and ("   |   HP "..math.floor(h.Health)) or "")
-      stLbl.Text=string.format("Aimbot: %s   Modo: %s\nFOV: %d   Mira: %s\nESP: %s   Voar: %s",
+      stLbl.Text=string.format("Aimbot: %s   Modo: %s\nFOV: %d   Ponto: %s\nMira: %s   ESP: %s",
         CFG.Aimbot and "ON" or "OFF",CFG.Mode,CFG.FOV,
+        CFG.TargetPart=="Head" and "cabeca" or "corpo",
         holding() and "ATIVA" or "espera",
-        CFG.ESP and "ON" or "OFF",CFG.Fly and "ON" or "OFF")
+        CFG.ESP and "ON" or "OFF")
     end
   end
 end)
@@ -895,17 +984,18 @@ RS:BindToRenderStep("ReaperAim",Enum.RenderPriority.Camera.Value+1,function()
   if not gui.Parent then return end
   circ.Visible=CFG.Aimbot
   if not CFG.Aimbot then ST.lock=nil return end
-  if not holding() or overPanel() then return end
+  if not holding() or overPanel() then ST.lock=nil return end
   local ch=LP.Character
   local h=ch and ch:FindFirstChildOfClass("Humanoid")
-  if not h or h.Health<=0 then return end
-  local t=getTarget()
-  if t and t.part and t.part.Parent then
-    applyAim(t)
-    if CFG.AutoFire then fireWeapon() end
-  else
-    ST.lock=nil
-  end
+  if not h or h.Health<=0 then ST.lock=nil return end
+  local t=pick()
+  if not t then ST.lock=nil return end
+  ST.lock=t
+  local tp=t.part
+  if not tp or not tp.Parent then ST.lock=nil return end
+  local p=aimPos(t)
+  if CFG.Mode=="Mouse" then mouseTo(p) else camTo(p) end
+  if CFG.AutoFire then fireWeapon() end
 end)
 
-toast("Reaper Aim","Carregado. Clique ou segure para mirar.",5)
+toast("Reaper Aim v22","Clique ou segure para mirar.",5)
